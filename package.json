@@ -1,0 +1,19 @@
+{
+  "name": "tube-counter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Industrial Tube Counter Web App with OpenCV & FastAPI",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n \"VITE,FASTAPI\" -c \"cyan.bold,magenta.bold\" \"npm run frontend\" \"npm run backend\"",
+    "frontend": "vite --host 0.0.0.0 --port 5173",
+    "backend": "venv\\Scripts\\uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "deploy:firebase": "npm run build && firebase deploy --only hosting"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "vite": "^6.2.0"
+  }
+}

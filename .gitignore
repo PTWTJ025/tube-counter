@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+
+# Build
+dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary uploads and data
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.png
+!uploads/.gitkeep
+records.json
+tube_counter.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/

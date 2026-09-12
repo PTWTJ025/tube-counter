@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>นับหลอดด้าย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F7;
+    --surface:#FFFFFF;
+    --surface-alt:#F1F3F5;
+    --border:#DDE1E4;
+    --border-strong:#C7CDD3;
+    --text:#14181C;
+    --text-muted:#5B6570;
+    --accent:#2C5CC5;
+    --accent-hover:#234A9E;
+    --accent-tint:#E8EEFB;
+    --danger:#C4453A;
+    --danger-tint:#FBEAE8;
+    --success:#2F8F5B;
+    --success-tint:#E7F4ED;
+    --radius-sm:6px;
+    --radius-md:10px;
+    --radius-lg:12px;
+    --shadow-sm:0 1px 2px rgba(20,24,28,0.06);
+    --shadow-md:0 4px 10px rgba(20,24,28,0.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans Thai', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .app{
+    max-width:520px;
+    margin:0 auto;
+    padding:16px 16px 48px;
+  }
+  header.top{
+    padding:18px 2px 20px;
+  }
+  header.top h1{
+    font-size:21px;
+    font-weight:700;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  header.top p{
+    font-size:13.5px;
+    color:var(--text-muted);
+    margin:0;
+    line-height:1.5;
+  }
+
+  /* ---- Card primitive ---- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow-sm);
+  }
+
+  /* ---- Camera / capture panel ---- */
+  .capture-panel{
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  .viewfinder{
+    position:relative;
+    width:100%;
+    aspect-ratio:3/4;
+    background:#0E1114;
+    overflow:hidden;
+  }
+  .viewfinder video,
+  .viewfinder canvas{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .viewfinder canvas#overlayCanvas{
+    object-fit:contain;
+    background:#0E1114;
+  }
+  .viewfinder .state-msg{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    color:#C6CDD4;
+    font-size:13.5px;
+    text-align:center;
+    padding:24px;
+  }
+  .spinner{
+    width:22px;height:22px;
+    border-radius:50%;
+    border:2.5px solid rgba(255,255,255,0.25);
+    border-top-color:#fff;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .count-chip{
+    position:absolute;
+    top:12px; left:12px;
+    background:rgba(14,17,20,0.72);
+    color:#fff;
+    padding:6px 12px;
+    border-radius:9999px;
+    font-size:13px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    backdrop-filter:blur(2px);
+  }
+  .count-chip .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:#4ADE80;
+  }
+
+  .capture-controls{
+    padding:14px;
+    border-top:1px solid var(--border);
+    display:flex;
+    gap:10px;
+  }
+
+  /* ---- Buttons ---- */
+  button{
+    font-family:inherit;
+    font-size:14.5px;
+    font-weight:600;
+    border-radius:var(--radius-sm);
+    border:1px solid transparent;
+    cursor:pointer;
+    padding:11px 16px;
+    transition:background .12s ease, border-color .12s ease, transform .04s ease;
+  }
+  button:active{transform:scale(0.98);}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+  .btn-primary{
+    background:var(--accent);
+    color:#fff;
+    flex:1;
+  }
+  .btn-primary:hover:not(:disabled){background:var(--accent-hover);}
+  .btn-secondary{
+    background:var(--surface);
+    color:var(--text);
+    border-color:var(--border-strong);
+  }
+  .btn-secondary:hover:not(:disabled){background:var(--surface-alt);}
+  .btn-ghost{
+    background:transparent;
+    color:var(--text-muted);
+    border-color:transparent;
+    padding:8px 10px;
+    font-size:13px;
+  }
+  .btn-ghost:hover{background:var(--surface-alt); color:var(--text);}
+  .btn-danger-ghost{
+    background:transparent;
+    color:var(--danger);
+    border-color:transparent;
+    padding:6px 8px;
+    font-size:12.5px;
+  }
+  .btn-danger-ghost:hover{background:var(--danger-tint);}
+
+  /* ---- Inline error banner ---- */
+  .banner{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background:var(--danger-tint);
+    border:1px solid #EFC3BE;
+    color:#8A2E26;
+    border-radius:var(--radius-md);
+    padding:12px 14px;
+    font-size:13.5px;
+    line-height:1.5;
+    margin-bottom:16px;
+  }
+  .banner button{
+    margin-top:6px;
+    background:#fff;
+    border:1px solid #EFC3BE;
+    color:#8A2E26;
+    padding:6px 12px;
+    font-size:13px;
+  }
+
+  /* ---- Result / save form ---- */
+  .result-panel{
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .field label{
+    font-size:13px;
+    font-weight:600;
+    color:var(--text-muted);
+  }
+  .count-editor{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .count-editor button{
+    width:38px; height:38px;
+    padding:0;
+    font-size:18px;
+    background:var(--surface-alt);
+    border:1px solid var(--border-strong);
+    color:var(--text);
+    flex:none;
+  }
+  .count-editor input{
+    width:100%;
+    text-align:center;
+    font-size:22px;
+    font-weight:700;
+    padding:8px 6px;
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm);
+    background:var(--surface);
+    color:var(--text);
+    font-family:inherit;
+  }
+  select, input[type="text"]{
+    font-family:inherit;
+    font-size:14.5px;
+    padding:10px 12px;
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm);
+    background:var(--surface);
+    color:var(--text);
+  }
+  select:focus, input:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .slider-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .slider-row input[type="range"]{
+    flex:1;
+    accent-color:var(--accent);
+  }
+  .slider-hint{
+    font-size:12px;
+    color:var(--text-muted);
+    display:flex;
+    justify-content:space-between;
+    margin-top:2px;
+  }
+  .form-actions{
+    display:flex;
+    gap:10px;
+  }
+
+  /* ---- History section ---- */
+  .history{
+    margin-top:24px;
+  }
+  .history-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:10px;
+    padding:0 2px;
+  }
+  .history-header h2{
+    font-size:15.5px;
+    font-weight:700;
+    margin:0;
+  }
+  .summary-chips{
+    display:flex;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .summary-chip{
+    background:var(--accent-tint);
+    color:var(--accent-hover);
+    border-radius:var(--radius-sm);
+    padding:8px 12px;
+    font-size:13px;
+    flex:1;
+  }
+  .summary-chip strong{
+    display:block;
+    font-size:17px;
+    font-weight:700;
+    margin-top:1px;
+  }
+  .history-list{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow-sm);
+    overflow:hidden;
+  }
+  .history-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 12px;
+    border-top:1px solid var(--border);
+  }
+  .history-row:first-child{border-top:none;}
+  .history-row img{
+    width:44px; height:44px;
+    object-fit:cover;
+    border-radius:var(--radius-sm);
+    border:1px solid var(--border);
+    flex:none;
+    background:var(--surface-alt);
+  }
+  .history-row .meta{
+    flex:1;
+    min-width:0;
+  }
+  .history-row .meta .type{
+    font-size:13.5px;
+    font-weight:600;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .history-row .meta .time{
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .history-row .count-badge{
+    font-size:15px;
+    font-weight:700;
+    color:var(--accent);
+    flex:none;
+    min-width:34px;
+    text-align:right;
+  }
+  .empty-state{
+    padding:34px 20px;
+    text-align:center;
+    color:var(--text-muted);
+    font-size:13.5px;
+    line-height:1.6;
+  }
+  .empty-state .icon{
+    font-size:26px;
+    margin-bottom:6px;
+  }
+
+  /* ---- Toast ---- */
+  #toast{
+    position:fixed;
+    left:50%;
+    bottom:22px;
+    transform:translateX(-50%) translateY(12px);
+    background:var(--text);
+    color:#fff;
+    padding:11px 18px;
+    border-radius:var(--radius-sm);
+    font-size:13.5px;
+    font-weight:600;
+    box-shadow:var(--shadow-md);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease, transform .18s ease;
+    z-index:50;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  #toast .dot{width:7px;height:7px;border-radius:50%;background:var(--success);}
+  #toast.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .spinner{animation:none;}
+    #toast{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <h1>นับหลอดด้าย</h1>
+    <p>เปิดกล้อง ถ่ายรูปหลอดในตะกร้า แล้วระบบจะนับจำนวนให้อัตโนมัติ — ปรับแก้และบันทึกพร้อมระบุประเภทได้</p>
+  </header>
+
+  <div id="bannerSlot"></div>
+
+  <section class="card capture-panel">
+    <div class="viewfinder" id="viewfinder">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="captureCanvas" style="display:none;"></canvas>
+      <canvas id="overlayCanvas" style="display:none;"></canvas>
+      <div class="state-msg" id="cameraState">
+        <div class="spinner"></div>
+        <span>กำลังเปิดกล้อง...</span>
+      </div>
+      <div class="count-chip" id="countChip" style="display:none;">
+        <span class="dot"></span>
+        <span id="countChipText">นับได้ 0 หลอด</span>
+      </div>
+    </div>
+    <div class="capture-controls" id="captureControls" style="display:none;">
+      <button class="btn-primary" id="btnCapture">ถ่ายรูปและนับ</button>
+    </div>
+  </section>
+
+  <section class="card result-panel" id="resultPanel" style="display:none;">
+    <div class="field">
+      <label for="countInput">จำนวนที่นับได้ (แก้ไขได้หากไม่ตรง)</label>
+      <div class="count-editor">
+        <button type="button" id="btnMinus" aria-label="ลดจำนวน">−</button>
+        <input type="number" id="countInput" min="0" value="0">
+        <button type="button" id="btnPlus" aria-label="เพิ่มจำนวน">+</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="sensitivity">ความเข้มงวดของการตรวจจับ</label>
+      <div class="slider-row">
+        <input type="range" id="sensitivity" min="25" max="65" value="45" step="1">
+      </div>
+      <div class="slider-hint">
+        <span>ตรวจจับเยอะ (อาจนับซ้ำ)</span>
+        <span>เข้มงวด (อาจตกหล่น)</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="typeSelect">ประเภทหลอดด้าย</label>
+      <select id="typeSelect">
+        <option value="พันทับ">พันทับ</option>
+        <option value="ใยแตก">ใยแตก</option>
+        <option value="อื่นๆ">อื่นๆ</option>
+      </select>
+    </div>
+
+    <div class="field" id="customTypeField" style="display:none;">
+      <label for="customType">ระบุประเภท</label>
+      <input type="text" id="customType" placeholder="พิมพ์ชื่อประเภท...">
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-secondary" id="btnRetake" style="flex:1;">ถ่ายใหม่</button>
+      <button class="btn-primary" id="btnSave" style="flex:1;">บันทึก</button>
+    </div>
+  </section>
+
+  <section class="history">
+    <div class="history-header">
+      <h2>ประวัติการนับ</h2>
+      <button class="btn-ghost" id="btnExport">ส่งออก CSV</button>
+    </div>
+
+    <div class="summary-chips" id="summaryChips" style="display:none;">
+      <div class="summary-chip">จำนวนครั้งที่บันทึก<strong id="sumEntries">0</strong></div>
+      <div class="summary-chip">รวมหลอดทั้งหมด<strong id="sumTotal">0</strong></div>
+    </div>
+
+    <div class="history-list" id="historyList">
+      <div class="empty-state">
+        <div class="icon">◎</div>
+        ยังไม่มีบันทึก — ถ่ายรูปแล้วกดบันทึกเพื่อเริ่มเก็บข้อมูล
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast"><span class="dot"></span><span id="toastText">บันทึกแล้ว</span></div>
+
+<script src="https://docs.opencv.org/4.9.0/opencv.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  var stream = null;
+  var cvReady = false;
+  var lastFrameCanvas = document.getElementById('captureCanvas');
+  var overlayCanvas = document.getElementById('overlayCanvas');
+  var video = document.getElementById('video');
+  var history = []; // {id, time, type, count, thumb}
+
+  var els = {
+    cameraState: document.getElementById('cameraState'),
+    captureControls: document.getElementById('captureControls'),
+    btnCapture: document.getElementById('btnCapture'),
+    countChip: document.getElementById('countChip'),
+    countChipText: document.getElementById('countChipText'),
+    resultPanel: document.getElementById('resultPanel'),
+    countInput: document.getElementById('countInput'),
+    btnMinus: document.getElementById('btnMinus'),
+    btnPlus: document.getElementById('btnPlus'),
+    sensitivity: document.getElementById('sensitivity'),
+    typeSelect: document.getElementById('typeSelect'),
+    customTypeField: document.getElementById('customTypeField'),
+    customType: document.getElementById('customType'),
+    btnRetake: document.getElementById('btnRetake'),
+    btnSave: document.getElementById('btnSave'),
+    bannerSlot: document.getElementById('bannerSlot'),
+    historyList: document.getElementById('historyList'),
+    summaryChips: document.getElementById('summaryChips'),
+    sumEntries: document.getElementById('sumEntries'),
+    sumTotal: document.getElementById('sumTotal'),
+    btnExport: document.getElementById('btnExport'),
+    toast: document.getElementById('toast'),
+    toastText: document.getElementById('toastText')
+  };
+
+  // ---------- opencv ready ----------
+  function onOpenCvReady(){
+    cvReady = true;
+  }
+  if (typeof cv !== 'undefined' && cv['onRuntimeInitialized'] !== undefined) {
+    cv['onRuntimeInitialized'] = onOpenCvReady;
+  } else {
+    var waitCv = setInterval(function(){
+      if (window.cv && cv.Mat) {
+        clearInterval(waitCv);
+        cv['onRuntimeInitialized'] = onOpenCvReady;
+      }
+    }, 200);
+  }
+
+  // ---------- camera ----------
+  function showBanner(msg, retryFn){
+    els.bannerSlot.innerHTML = '';
+    var b = document.createElement('div');
+    b.className = 'banner';
+    var span = document.createElement('div');
+    span.textContent = msg;
+    b.appendChild(span);
+    if (retryFn){
+      var btn = document.createElement('button');
+      btn.textContent = 'ลองอีกครั้ง';
+      btn.onclick = function(){ els.bannerSlot.innerHTML=''; retryFn(); };
+      var wrap = document.createElement('div');
+      wrap.style.width='100%';
+      wrap.appendChild(btn);
+      b.appendChild(wrap);
+    }
+    els.bannerSlot.appendChild(b);
+  }
+
+  function startCamera(){
+    els.cameraState.style.display = 'flex';
+    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังเปิดกล้อง...</span>';
+    els.captureControls.style.display = 'none';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      showBanner('เบราว์เซอร์นี้ไม่รองรับการเข้าถึงกล้อง');
+      els.cameraState.innerHTML = '<span>ไม่รองรับกล้อง</span>';
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width:{ideal:1280}, height:{ideal:1706} },
+      audio: false
+    }).then(function(s){
+      stream = s;
+      video.srcObject = s;
+      video.style.display = 'block';
+      overlayCanvas.style.display = 'none';
+      els.cameraState.style.display = 'none';
+      els.captureControls.style.display = 'flex';
+    }).catch(function(err){
+      els.cameraState.innerHTML = '<span>ไม่สามารถเปิดกล้องได้</span>';
+      showBanner('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้งานกล้องในเบราว์เซอร์ แล้วลองอีกครั้ง', startCamera);
+    });
+  }
+
+  function resumeLiveView(){
+    els.resultPanel.style.display = 'none';
+    els.countChip.style.display = 'none';
+    overlayCanvas.style.display = 'none';
+    video.style.display = 'block';
+    els.captureControls.style.display = 'flex';
+  }
+
+  // ---------- capture + detect ----------
+  function captureFrame(){
+    var w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h) return;
+    lastFrameCanvas.width = w;
+    lastFrameCanvas.height = h;
+    var ctx = lastFrameCanvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, w, h);
+  }
+
+  function detectAndRender(){
+    if (!cvReady){
+      showBanner('กำลังโหลดโมดูลประมวลผลภาพ กรุณารอสักครู่แล้วลองใหม่');
+      return;
+    }
+    els.captureControls.style.display = 'none';
+    video.style.display = 'none';
+    overlayCanvas.style.display = 'block';
+    els.cameraState.style.display = 'flex';
+    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังนับ...</span>';
+
+    setTimeout(function(){
+      var count = runHoughCircles(lastFrameCanvas, overlayCanvas, parseInt(els.sensitivity.value, 10));
+      els.cameraState.style.display = 'none';
+      els.countChip.style.display = 'flex';
+      els.countChipText.textContent = 'นับได้ ' + count + ' หลอด';
+      els.countInput.value = count;
+      els.resultPanel.style.display = 'flex';
+    }, 30);
+  }
+
+  function runHoughCircles(srcCanvas, outCanvas, param2){
+    var src = cv.imread(srcCanvas);
+    var resized = new cv.Mat();
+    var maxDim = Math.max(src.rows, src.cols);
+    var scale = Math.min(1, 1000 / maxDim);
+    var newW = Math.max(1, Math.round(src.cols * scale));
+    var newH = Math.max(1, Math.round(src.rows * scale));
+    cv.resize(src, resized, new cv.Size(newW, newH), 0, 0, cv.INTER_AREA);
+
+    var gray = new cv.Mat();
+    cv.cvtColor(resized, gray, cv.COLOR_RGBA2GRAY);
+    var blurred = new cv.Mat();
+    cv.medianBlur(gray, blurred, 5);
+    var eq = new cv.Mat();
+    cv.equalizeHist(blurred, eq);
+
+    var circles = new cv.Mat();
+    cv.HoughCircles(eq, circles, cv.HOUGH_GRADIENT, 1.2, 40, 90, param2, 22, 42);
+
+    var display = resized.clone();
+    var count = circles.cols;
+    for (var i = 0; i < circles.cols; i++){
+      var x = circles.data32F[i*3];
+      var y = circles.data32F[i*3+1];
+      var r = circles.data32F[i*3+2];
+      cv.circle(display, new cv.Point(x,y), r, new cv.Scalar(74,222,128,255), 2);
+      cv.circle(display, new cv.Point(x,y), 2, new cv.Scalar(196,69,58,255), 3);
+    }
+
+    outCanvas.width = newW;
+    outCanvas.height = newH;
+    cv.imshow(outCanvas, display);
+
+    src.delete(); resized.delete(); gray.delete(); blurred.delete();
+    eq.delete(); circles.delete(); display.delete();
+    return count;
+  }
+
+  // ---------- form helpers ----------
+  function currentTypeLabel(){
+    if (els.typeSelect.value === 'อื่นๆ'){
+      return (els.customType.value || '').trim() || 'อื่นๆ';
+    }
+    return els.typeSelect.value;
+  }
+
+  function showToast(msg){
+    els.toastText.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){
+      els.toast.classList.remove('show');
+    }, 2600);
+  }
+
+  // ---------- history ----------
+  function renderHistory(){
+    if (history.length === 0){
+      els.summaryChips.style.display = 'none';
+      els.historyList.innerHTML = '<div class="empty-state"><div class="icon">&#9678;</div>ยังไม่มีบันทึก — ถ่ายรูปแล้วกดบันทึกเพื่อเริ่มเก็บข้อมูล</div>';
+      return;
+    }
+    els.summaryChips.style.display = 'flex';
+    els.sumEntries.textContent = history.length;
+    els.sumTotal.textContent = history.reduce(function(a,e){return a+e.count;}, 0);
+
+    els.historyList.innerHTML = '';
+    for (var i = history.length - 1; i >= 0; i--){
+      (function(entry){
+        var row = document.createElement('div');
+        row.className = 'history-row';
+
+        var img = document.createElement('img');
+        img.src = entry.thumb;
+        img.alt = '';
+
+        var meta = document.createElement('div');
+        meta.className = 'meta';
+        var typeEl = document.createElement('div');
+        typeEl.className = 'type';
+        typeEl.textContent = entry.type;
+        var timeEl = document.createElement('div');
+        timeEl.className = 'time';
+        timeEl.textContent = entry.time;
+        meta.appendChild(typeEl);
+        meta.appendChild(timeEl);
+
+        var countEl = document.createElement('div');
+        countEl.className = 'count-badge';
+        countEl.textContent = entry.count;
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn-danger-ghost';
+        delBtn.textContent = 'ลบ';
+        delBtn.onclick = function(){
+          history = history.filter(function(e){ return e.id !== entry.id; });
+          renderHistory();
+        };
+
+        row.appendChild(img);
+        row.appendChild(meta);
+        row.appendChild(countEl);
+        row.appendChild(delBtn);
+        els.historyList.appendChild(row);
+      })(history[i]);
+    }
+  }
+
+  function saveEntry(){
+    var count = parseInt(els.countInput.value, 10);
+    if (isNaN(count) || count < 0){
+      els.countInput.focus();
+      return;
+    }
+    if (els.typeSelect.value === 'อื่นๆ' && !els.customType.value.trim()){
+      els.customType.focus();
+      return;
+    }
+    var thumbCanvas = document.createElement('canvas');
+    var tw = 160, th = Math.round(160 * (lastFrameCanvas.height / lastFrameCanvas.width));
+    thumbCanvas.width = tw; thumbCanvas.height = th;
+    thumbCanvas.getContext('2d').drawImage(lastFrameCanvas, 0, 0, tw, th);
+
+    var now = new Date();
+    var timeStr = now.toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'});
+
+    history.push({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      time: timeStr,
+      type: currentTypeLabel(),
+      count: count,
+      thumb: thumbCanvas.toDataURL('image/jpeg', 0.7)
+    });
+    renderHistory();
+    showToast('บันทึกแล้ว');
+    resumeLiveView();
+  }
+
+  function exportCsv(){
+    if (history.length === 0){
+      showToast('ยังไม่มีข้อมูลให้ส่งออก');
+      return;
+    }
+    var rows = [['เวลา','ประเภท','จำนวน']];
+    history.forEach(function(e){ rows.push([e.time, e.type, e.count]); });
+    var csv = rows.map(function(r){
+      return r.map(function(cell){
+        var s = String(cell).replace(/"/g,'""');
+        return /[",\n]/.test(s) ? '"'+s+'"' : s;
+      }).join(',');
+    }).join('\r\n');
+    var blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'tube-count-' + Date.now() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- wire up events ----------
+  els.btnCapture.addEventListener('click', function(){
+    captureFrame();
+    detectAndRender();
+  });
+
+  els.btnRetake.addEventListener('click', resumeLiveView);
+  els.btnSave.addEventListener('click', saveEntry);
+
+  els.btnMinus.addEventListener('click', function(){
+    var v = Math.max(0, (parseInt(els.countInput.value,10)||0) - 1);
+    els.countInput.value = v;
+  });
+  els.btnPlus.addEventListener('click', function(){
+    var v = (parseInt(els.countInput.value,10)||0) + 1;
+    els.countInput.value = v;
+  });
+
+  els.sensitivity.addEventListener('change', function(){
+    if (els.resultPanel.style.display === 'flex'){
+      var count = runHoughCircles(lastFrameCanvas, overlayCanvas, parseInt(els.sensitivity.value,10));
+      els.countChipText.textContent = 'นับได้ ' + count + ' หลอด';
+      els.countInput.value = count;
+    }
+  });
+
+  els.typeSelect.addEventListener('change', function(){
+    els.customTypeField.style.display = (els.typeSelect.value === 'อื่นๆ') ? 'flex' : 'none';
+  });
+
+  els.btnExport.addEventListener('click', exportCsv);
+
+  window.addEventListener('beforeunload', function(){
+    if (stream){ stream.getTracks().forEach(function(t){ t.stop(); }); }
+  });
+
+  // ---------- init ----------
+  startCamera();
+  renderHistory();
+})();
+</script>
+</body>
+</html>
