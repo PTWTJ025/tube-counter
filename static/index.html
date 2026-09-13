@@ -766,8 +766,8 @@
     var eq = new cv.Mat();
     cv.equalizeHist(blurred, eq);
 
-    // Try multiple param2 values and collect results
-    var candidates = [20, 25, 30, 35, 40, 45, 50, 55, 60];
+    // Try 5 param2 values (fewer = faster on mobile; still covers most scenes)
+    var candidates = [22, 30, 38, 46, 55];
     var results = [];
     for (var ti = 0; ti < candidates.length; ti++){
       var p2 = candidates[ti];
@@ -908,7 +908,10 @@
     els.countInput.value = count;
   });
 
-  // Load image helper — show loading state immediately on file select
+  // Load image helper — show loading state immediately, compress phone photos
+  // Phone cameras produce 12–48 MP images; downscale to MAX_IMG_DIM before OpenCV
+  var MAX_IMG_DIM = 1200;
+
   function loadImageFromFile(file){
     if (!file || !file.type.startsWith('image/')) return;
 
@@ -919,19 +922,25 @@
     els.cameraState.style.display = 'flex';
     els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังโหลดรูปภาพ...</span>';
 
-    var reader = new FileReader();
-    reader.onload = function(evt){
-      var img = new Image();
-      img.onload = function(){
-        lastFrameCanvas.width = img.width;
-        lastFrameCanvas.height = img.height;
-        var ctx = lastFrameCanvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        detectAndRender();
-      };
-      img.src = evt.target.result;
+    // createObjectURL is much faster than FileReader base64 on mobile
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      // Downscale if the image exceeds MAX_IMG_DIM (common on phone cameras)
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var scale = Math.min(1, MAX_IMG_DIM / Math.max(w, h));
+      var tw = Math.round(w * scale);
+      var th = Math.round(h * scale);
+
+      lastFrameCanvas.width  = tw;
+      lastFrameCanvas.height = th;
+      var ctx = lastFrameCanvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, tw, th); // draw at reduced size
+      URL.revokeObjectURL(url);          // free memory immediately
+      detectAndRender();
     };
-    reader.readAsDataURL(file);
+    img.onerror = function(){ URL.revokeObjectURL(url); };
+    img.src = url;
   }
 
   // Handle file upload button
