@@ -503,16 +503,7 @@
       </div>
     </div>
 
-    <div class="field">
-      <label for="sensitivity">ความเข้มงวดของการตรวจจับ (<span id="sensVal">35</span>)</label>
-      <div class="slider-row">
-        <input type="range" id="sensitivity" min="20" max="65" value="35" step="1">
-      </div>
-      <div class="slider-hint">
-        <span>ตรวจจับเยอะ (อาจนับซ้ำ)</span>
-        <span>เข้มงวด (อาจตกหล่น)</span>
-      </div>
-    </div>
+
 
     <div class="field">
       <label for="typeSelect">ประเภทความเสียหายของหลอดด้าย</label>
@@ -592,8 +583,7 @@
     countInput: document.getElementById('countInput'),
     btnMinus: document.getElementById('btnMinus'),
     btnPlus: document.getElementById('btnPlus'),
-    sensitivity: document.getElementById('sensitivity'),
-    sensVal: document.getElementById('sensVal'),
+
     typeSelect: document.getElementById('typeSelect'),
     customTypeField: document.getElementById('customTypeField'),
     customType: document.getElementById('customType'),
@@ -706,7 +696,7 @@
     if (cvReady) {
       setTimeout(function(){
         try {
-          var count = runHoughCircles(lastFrameCanvas, overlayCanvas, parseInt(els.sensitivity.value, 10));
+          var count = runHoughCirclesAuto(lastFrameCanvas, overlayCanvas);
           els.cameraState.style.display = 'none';
           els.countChip.style.display = 'flex';
           els.canvasTip.style.display = 'block';
@@ -727,7 +717,6 @@
     lastFrameCanvas.toBlob(function(blob){
       var formData = new FormData();
       formData.append('file', blob, 'frame.jpg');
-      formData.append('param2', els.sensitivity.value);
 
       fetch(API_BASE + '/api/detect', {
         method: 'POST',
@@ -757,6 +746,76 @@
         showBanner('การประมวลผลล้มเหลว: ' + err.message);
       });
     }, 'image/jpeg', 0.85);
+  }
+
+  // Auto-tune param2: try several values and pick the one whose count
+  // is closest to the median of all non-zero results.
+  function runHoughCirclesAuto(srcCanvas, outCanvas){
+    var src = cv.imread(srcCanvas);
+    var resized = new cv.Mat();
+    var maxDim = Math.max(src.rows, src.cols);
+    var scale = Math.min(1, 1000 / maxDim);
+    var newW = Math.max(1, Math.round(src.cols * scale));
+    var newH = Math.max(1, Math.round(src.rows * scale));
+    cv.resize(src, resized, new cv.Size(newW, newH), 0, 0, cv.INTER_AREA);
+
+    var gray = new cv.Mat();
+    cv.cvtColor(resized, gray, cv.COLOR_RGBA2GRAY);
+    var blurred = new cv.Mat();
+    cv.medianBlur(gray, blurred, 5);
+    var eq = new cv.Mat();
+    cv.equalizeHist(blurred, eq);
+
+    // Try multiple param2 values and collect results
+    var candidates = [20, 25, 30, 35, 40, 45, 50, 55, 60];
+    var results = [];
+    for (var ti = 0; ti < candidates.length; ti++){
+      var p2 = candidates[ti];
+      var c = new cv.Mat();
+      cv.HoughCircles(eq, c, cv.HOUGH_GRADIENT, 1.2, 25, 80, p2, 18, 55);
+      results.push({ p2: p2, count: c.cols, mat: c });
+    }
+
+    // Find median count across non-zero results
+    var nonZero = results.filter(function(r){ return r.count > 0; });
+    var bestResult;
+    if (nonZero.length === 0){
+      bestResult = results[Math.floor(results.length / 2)];
+    } else {
+      var sorted = nonZero.slice().sort(function(a,b){ return a.count - b.count; });
+      var median = sorted[Math.floor(sorted.length / 2)].count;
+      // Pick the result closest to median (prefer slightly higher param2 = stricter)
+      var best = nonZero[0], bestDiff = Math.abs(nonZero[0].count - median);
+      for (var ri = 1; ri < nonZero.length; ri++){
+        var diff = Math.abs(nonZero[ri].count - median);
+        if (diff < bestDiff || (diff === bestDiff && nonZero[ri].p2 > best.p2)){
+          bestDiff = diff; best = nonZero[ri];
+        }
+      }
+      bestResult = best;
+    }
+
+    // Rebuild detectedCircles from chosen result
+    detectedCircles = [];
+    var chosen = bestResult.mat;
+    for (var i = 0; i < chosen.cols; i++){
+      detectedCircles.push({
+        x: chosen.data32F[i*3],
+        y: chosen.data32F[i*3+1],
+        r: chosen.data32F[i*3+2],
+        index: i + 1
+      });
+    }
+
+    outCanvas.width = newW;
+    outCanvas.height = newH;
+    redrawCirclesOnCanvas(outCanvas, resized, detectedCircles);
+
+    // cleanup
+    src.delete(); resized.delete(); gray.delete(); blurred.delete(); eq.delete();
+    results.forEach(function(r){ r.mat.delete(); });
+
+    return detectedCircles.length;
   }
 
   function runHoughCircles(srcCanvas, outCanvas, param2){
@@ -849,9 +908,17 @@
     els.countInput.value = count;
   });
 
-  // Load image helper
+  // Load image helper — show loading state immediately on file select
   function loadImageFromFile(file){
     if (!file || !file.type.startsWith('image/')) return;
+
+    // Show loading overlay right away
+    els.captureControls.style.display = 'none';
+    video.style.display = 'none';
+    overlayCanvas.style.display = 'none';
+    els.cameraState.style.display = 'flex';
+    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังโหลดรูปภาพ...</span>';
+
     var reader = new FileReader();
     reader.onload = function(evt){
       var img = new Image();
