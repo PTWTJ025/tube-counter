@@ -447,38 +447,6 @@
     transform:translateX(-50%) translateY(0);
   }
 
-
-  /* ---- Debug Log Panel ---- */
-  #debugPanel{
-    background: #0f0f1a;
-    border: 1px solid #2a2a3a;
-    border-radius: var(--radius-sm);
-    margin: 10px 0 0;
-    padding: 10px 12px;
-    font-family: 'Courier New', monospace;
-    font-size: 11.5px;
-    line-height: 1.65;
-    color: #a0f0a0;
-    max-height: 200px;
-    overflow-y: auto;
-    display: none;
-  }
-  #debugPanel .log-time { color: #555; }
-  #debugPanel .log-warn { color: #f0c040; }
-  #debugPanel .log-ok   { color: #4ee; }
-  #debugPanel .log-head { color: #fff; font-weight:bold; }
-  #debugClear{
-    font-size:10px; padding:2px 8px; margin-left:8px;
-    background:#222; color:#aaa; border:1px solid #333;
-    border-radius:4px; cursor:pointer;
-  }
-  #debugToggle{
-    font-size:11px; padding:3px 10px; margin-top:8px;
-    background:transparent; color:var(--text-muted);
-    border:1px solid var(--border); border-radius:20px;
-    cursor:pointer; display:block; width:fit-content;
-  }
-
   @media (prefers-reduced-motion: reduce){
     .spinner{animation:none;}
     #toast{transition:none;}
@@ -523,8 +491,6 @@
         <input type="file" id="fileUpload" accept="image/*" style="display:none;">
       </label>
     </div>
-    <button id="debugToggle">🔍 ดู Debug Log</button>
-    <div id="debugPanel"></div>
   </section>
 
   <section class="card result-panel" id="resultPanel" style="display:none;">
@@ -635,29 +601,6 @@
     storageBadge: document.getElementById('storageBadge'),
     storageBadgeText: document.getElementById('storageBadgeText')
   };
-
-  // ---------- debug log ----------
-  var debugEl = document.getElementById('debugPanel');
-  var debugToggleEl = document.getElementById('debugToggle');
-  debugToggleEl.addEventListener('click', function(){
-    var shown = debugEl.style.display === 'block';
-    debugEl.style.display = shown ? 'none' : 'block';
-    debugToggleEl.textContent = shown ? '🔍 ดู Debug Log' : '🔍 ซ่อน Debug Log';
-  });
-
-  function logUI(msg, type){
-    debugEl.style.display = 'block';
-    debugToggleEl.textContent = '🔍 ซ่อน Debug Log';
-    var now = new Date();
-    var ts = now.toLocaleTimeString('th-TH', {hour12:false}) + '.' + String(now.getMilliseconds()).padStart(3,'0');
-    var line = document.createElement('div');
-    var cls = type === 'warn' ? 'log-warn' : type === 'ok' ? 'log-ok' : type === 'head' ? 'log-head' : '';
-    line.innerHTML = '<span class="log-time">[' + ts + ']</span> ' +
-                     (cls ? '<span class="' + cls + '">' + msg + '</span>' : msg);
-    debugEl.appendChild(line);
-    debugEl.scrollTop = debugEl.scrollHeight;
-    console.log('[TubeCounter]', msg);
-  }
 
   // ---------- opencv ready ----------
   function onOpenCvReady(){
@@ -808,7 +751,6 @@
   // Auto-tune param2: try several values and pick the one whose count
   // is closest to the median of all non-zero results.
   function runHoughCirclesAuto(srcCanvas, outCanvas){
-    var tStart = performance.now();
     var src = cv.imread(srcCanvas);
     var resized = new cv.Mat();
     var maxDim = Math.max(src.rows, src.cols);
@@ -817,8 +759,6 @@
     var newH = Math.max(1, Math.round(src.rows * scale));
     cv.resize(src, resized, new cv.Size(newW, newH), 0, 0, cv.INTER_AREA);
 
-    logUI('🔬 OpenCV ประมวลผลที่: ' + newW + '×' + newH + 'px');
-
     var gray = new cv.Mat();
     cv.cvtColor(resized, gray, cv.COLOR_RGBA2GRAY);
     var blurred = new cv.Mat();
@@ -826,17 +766,13 @@
     var eq = new cv.Mat();
     cv.equalizeHist(blurred, eq);
 
-    // Try 5 param2 values (fewer = faster on mobile; still covers most scenes)
-    var candidates = [22, 30, 38, 46, 55];
+    // Try multiple param2 values and collect results
+    var candidates = [20, 25, 30, 35, 40, 45, 50, 55, 60];
     var results = [];
-    logUI('⚙️ Auto-tune HoughCircles (param2):');
     for (var ti = 0; ti < candidates.length; ti++){
       var p2 = candidates[ti];
-      var tP = performance.now();
       var c = new cv.Mat();
       cv.HoughCircles(eq, c, cv.HOUGH_GRADIENT, 1.2, 25, 80, p2, 18, 55);
-      var durP = (performance.now() - tP).toFixed(0);
-      logUI('  param2=' + p2 + '  →  นับได้ ' + c.cols + ' วงกลม  (' + durP + 'ms)');
       results.push({ p2: p2, count: c.cols, mat: c });
     }
 
@@ -859,8 +795,6 @@
       bestResult = best;
     }
 
-    logUI('✅ เลือก param2=' + bestResult.p2 + '  ผลลัพธ์: ' + bestResult.count + ' วงกลม', 'ok');
-
     // Rebuild detectedCircles from chosen result
     detectedCircles = [];
     var chosen = bestResult.mat;
@@ -876,9 +810,6 @@
     outCanvas.width = newW;
     outCanvas.height = newH;
     redrawCirclesOnCanvas(outCanvas, resized, detectedCircles);
-
-    var totalMs = (performance.now() - tStart).toFixed(0);
-    logUI('⏱️ รวมทั้งหมด: ' + totalMs + 'ms', 'ok');
 
     // cleanup
     src.delete(); resized.delete(); gray.delete(); blurred.delete(); eq.delete();
@@ -977,53 +908,107 @@
     els.countInput.value = count;
   });
 
-  // Load image helper — show loading state immediately, compress phone photos
-  // Phone cameras produce 12–48 MP images; downscale to MAX_IMG_DIM before OpenCV
-  var MAX_IMG_DIM = 1200;
+  // ---------- image load helper ----------
+  // MAX pixel dimension before passing to OpenCV (phone cameras = 12–48MP → too slow without this)
+  var MAX_IMG_DIM = 1400;
+
+  // HEIC/HEIF mime types + filename extensions browser usually can't decode
+  function isHeic(file){
+    if (file.type === 'image/heic' || file.type === 'image/heif') return true;
+    var name = (file.name || '').toLowerCase();
+    return name.endsWith('.heic') || name.endsWith('.heif');
+  }
+
+  function showCameraState(html){
+    els.cameraState.style.display = 'flex';
+    els.cameraState.innerHTML = html;
+  }
+
+  function restoreUI(){
+    els.cameraState.style.display = 'none';
+    els.captureControls.style.display = 'flex';
+  }
 
   function loadImageFromFile(file){
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
 
-    logUI('─────────────────────────────', 'head');
-    logUI('📂 ไฟล์: ' + file.name);
-    logUI('📦 ขนาดไฟล์: ' + (file.size / 1024 / 1024).toFixed(2) + ' MB (' + file.type + ')');
+    // ── HEIC guard ──────────────────────────────────────────────────────────
+    if (isHeic(file)){
+      els.captureControls.style.display = 'none';
+      video.style.display = 'none';
+      overlayCanvas.style.display = 'none';
+      showCameraState(
+        '<div style="padding:16px 20px;text-align:center;line-height:1.7;">' +
+        '<div style="font-size:28px;margin-bottom:6px;">📵</div>' +
+        '<strong>ไม่รองรับไฟล์ HEIC/HEIF</strong><br>' +
+        '<span style="font-size:13px;color:var(--text-muted);">' +
+        'รูปจากกล้อง iPhone บันทึกเป็น HEIC ซึ่ง browser เปิดไม่ได้<br>' +
+        '<br>วิธีแก้:<br>' +
+        '• ตั้งกล้องเป็น <b>JPEG Most Compatible</b><br>' +
+        '  (Settings → Camera → Formats → Most Compatible)<br>' +
+        '• หรือถ่าย <b>screenshot</b> แล้วส่งมาแทน<br>' +
+        '• หรือแชร์ผ่าน <b>AirDrop→ แปลง JPEG</b>' +
+        '</span><br><br>' +
+        '<button onclick="(function(){' +
+          'document.getElementById(\'cameraState\').style.display=\'none\';' +
+          'document.getElementById(\'captureControls\').style.display=\'flex\';' +
+        '})()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button>' +
+        '</div>'
+      );
+      return;
+    }
 
-    // Show loading overlay right away
+    if (!file.type.startsWith('image/')) return;
+
+    // ── Show loading immediately ─────────────────────────────────────────────
     els.captureControls.style.display = 'none';
     video.style.display = 'none';
     overlayCanvas.style.display = 'none';
-    els.cameraState.style.display = 'flex';
-    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังโหลดรูปภาพ...</span>';
+    showCameraState('<div class="spinner"></div><span>กำลังโหลดรูปภาพ...</span>');
 
-    var t0 = performance.now();
-    // createObjectURL is much faster than FileReader base64 on mobile
-    var url = URL.createObjectURL(file);
+    // ── createObjectURL (faster than FileReader for large files) ────────────
+    var url;
+    try { url = URL.createObjectURL(file); } catch(e){ restoreUI(); return; }
+
     var img = new Image();
     img.onload = function(){
-      var loadMs = (performance.now() - t0).toFixed(0);
-      // Downscale if the image exceeds MAX_IMG_DIM (common on phone cameras)
       var w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h){ URL.revokeObjectURL(url); restoreUI(); return; }
+
+      // Scale down large phone photos before OpenCV (keeps accuracy, much faster)
       var scale = Math.min(1, MAX_IMG_DIM / Math.max(w, h));
       var tw = Math.round(w * scale);
       var th = Math.round(h * scale);
 
-      logUI('🖼️ ความละเอียดเดิม: ' + w + '×' + h + 'px  (โหลดใช้ ' + loadMs + 'ms)');
-      if (scale < 1){
-        logUI('⚙️ Scale ลงเหลือ: ' + tw + '×' + th + 'px  (scale=' + scale.toFixed(3) + ')', 'warn');
-      } else {
-        logUI('✅ ไม่ต้อง scale (ขนาดปกติ)', 'ok');
-      }
+      showCameraState('<div class="spinner"></div><span>กำลังประมวลผล' +
+        (scale < 1 ? ' (ปรับขนาด ' + tw + '×' + th + 'px)' : '') + '...</span>');
 
+      // Draw onto canvas at scaled size
       lastFrameCanvas.width  = tw;
       lastFrameCanvas.height = th;
       var ctx = lastFrameCanvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, tw, th); // draw at reduced size
-      URL.revokeObjectURL(url);          // free memory immediately
+      ctx.drawImage(img, 0, 0, tw, th);
+
+      URL.revokeObjectURL(url);
       detectAndRender();
     };
-    img.onerror = function(){ URL.revokeObjectURL(url); logUI('❌ โหลดรูปไม่ได้', 'warn'); };
+    img.onerror = function(){
+      URL.revokeObjectURL(url);
+      showCameraState(
+        '<div style="padding:16px;text-align:center;">' +
+        '<div style="font-size:26px;">⚠️</div>' +
+        'Browser เปิดไฟล์นี้ไม่ได้<br>' +
+        '<span style="font-size:12px;color:var(--text-muted);">ลองแปลงเป็น JPEG ก่อนส่งมา</span><br><br>' +
+        '<button onclick="(function(){' +
+          'document.getElementById(\'cameraState\').style.display=\'none\';' +
+          'document.getElementById(\'captureControls\').style.display=\'flex\';' +
+        '})()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button>' +
+        '</div>'
+      );
+    };
     img.src = url;
   }
+
 
   // Handle file upload button
   els.fileUpload.addEventListener('change', function(e){
