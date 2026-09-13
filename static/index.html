@@ -553,6 +553,7 @@
 
 <div id="toast"><span class="dot"></span><span id="toastText">บันทึกแล้ว</span></div>
 
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://docs.opencv.org/4.9.0/opencv.js"></script>
 <script type="module">
 (function(){
@@ -932,43 +933,47 @@
   function loadImageFromFile(file){
     if (!file) return;
 
-    // ── HEIC guard ──────────────────────────────────────────────────────────
-    if (isHeic(file)){
-      els.captureControls.style.display = 'none';
-      video.style.display = 'none';
-      overlayCanvas.style.display = 'none';
-      showCameraState(
-        '<div style="padding:16px 20px;text-align:center;line-height:1.7;">' +
-        '<div style="font-size:28px;margin-bottom:6px;">📵</div>' +
-        '<strong>ไม่รองรับไฟล์ HEIC/HEIF</strong><br>' +
-        '<span style="font-size:13px;color:var(--text-muted);">' +
-        'รูปจากกล้อง iPhone บันทึกเป็น HEIC ซึ่ง browser เปิดไม่ได้<br>' +
-        '<br>วิธีแก้:<br>' +
-        '• ตั้งกล้องเป็น <b>JPEG Most Compatible</b><br>' +
-        '  (Settings → Camera → Formats → Most Compatible)<br>' +
-        '• หรือถ่าย <b>screenshot</b> แล้วส่งมาแทน<br>' +
-        '• หรือแชร์ผ่าน <b>AirDrop→ แปลง JPEG</b>' +
-        '</span><br><br>' +
-        '<button onclick="(function(){' +
-          'document.getElementById(\'cameraState\').style.display=\'none\';' +
-          'document.getElementById(\'captureControls\').style.display=\'flex\';' +
-        '})()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button>' +
-        '</div>'
-      );
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) return;
-
-    // ── Show loading immediately ─────────────────────────────────────────────
+    // ── Show loading immediately ────────────────────────────────────────────
     els.captureControls.style.display = 'none';
     video.style.display = 'none';
     overlayCanvas.style.display = 'none';
     showCameraState('<div class="spinner"></div><span>กำลังโหลดรูปภาพ...</span>');
 
-    // ── createObjectURL (faster than FileReader for large files) ────────────
+    // ── HEIC/HEIF → แปลงเป็น JPEG อัตโนมัติ ────────────────────────────────
+    if (isHeic(file)){
+      showCameraState('<div class="spinner"></div><span>กำลังแปลง HEIC → JPEG อัตโนมัติ...</span>');
+      if (typeof heic2any === 'undefined'){
+        showCameraState(
+          '<div style="padding:16px;text-align:center;"><div style="font-size:26px;">⚠️</div>' +
+          'โหลด heic2any ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ต<br><br>' +
+          '<button onclick="restoreUI()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button></div>'
+        );
+        return;
+      }
+      heic2any({ blob: file, toType: 'image/jpeg', quality: 0.88 })
+        .then(function(jpegBlob){
+          var blob = Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob;
+          loadBlobToCanvas(blob);
+        })
+        .catch(function(){
+          showCameraState(
+            '<div style="padding:16px;text-align:center;"><div style="font-size:26px;">⚠️</div>' +
+            'แปลง HEIC ไม่สำเร็จ<br>' +
+            '<span style="font-size:12px;color:var(--text-muted);">ลองตั้งกล้อง iPhone → Most Compatible แล้วถ่ายใหม่</span><br><br>' +
+            '<button onclick="restoreUI()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button></div>'
+          );
+        });
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) return;
+    loadBlobToCanvas(file);
+  }
+
+  // แยก logic วาดภาพลง canvas ออกมา — ใช้ร่วมกันทั้ง JPEG ปกติ และ HEIC-converted
+  function loadBlobToCanvas(blob){
     var url;
-    try { url = URL.createObjectURL(file); } catch(e){ restoreUI(); return; }
+    try { url = URL.createObjectURL(blob); } catch(e){ restoreUI(); return; }
 
     var img = new Image();
     img.onload = function(){
@@ -981,9 +986,8 @@
       var th = Math.round(h * scale);
 
       showCameraState('<div class="spinner"></div><span>กำลังประมวลผล' +
-        (scale < 1 ? ' (ปรับขนาด ' + tw + '×' + th + 'px)' : '') + '...</span>');
+        (scale < 1 ? ' (ปรับขนาด ' + tw + '\u00d7' + th + 'px)' : '') + '...</span>');
 
-      // Draw onto canvas at scaled size
       lastFrameCanvas.width  = tw;
       lastFrameCanvas.height = th;
       var ctx = lastFrameCanvas.getContext('2d');
@@ -999,10 +1003,7 @@
         '<div style="font-size:26px;">⚠️</div>' +
         'Browser เปิดไฟล์นี้ไม่ได้<br>' +
         '<span style="font-size:12px;color:var(--text-muted);">ลองแปลงเป็น JPEG ก่อนส่งมา</span><br><br>' +
-        '<button onclick="(function(){' +
-          'document.getElementById(\'cameraState\').style.display=\'none\';' +
-          'document.getElementById(\'captureControls\').style.display=\'flex\';' +
-        '})()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button>' +
+        '<button onclick="restoreUI()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button>' +
         '</div>'
       );
     };
