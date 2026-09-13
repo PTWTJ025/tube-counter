@@ -1199,22 +1199,7 @@
     els.countInput.value = v;
   });
 
-  els.sensitivity.addEventListener('input', function(){
-    els.sensVal.textContent = els.sensitivity.value;
-  });
 
-  els.sensitivity.addEventListener('change', function(){
-    els.sensVal.textContent = els.sensitivity.value;
-    if (els.resultPanel.style.display === 'flex'){
-      if (cvReady) {
-        var count = runHoughCircles(lastFrameCanvas, overlayCanvas, parseInt(els.sensitivity.value,10));
-        els.countChipText.textContent = 'นับได้ ' + count + ' หลอด';
-        els.countInput.value = count;
-      } else {
-        serverDetectFallback();
-      }
-    }
-  });
 
   els.typeSelect.addEventListener('change', function(){
     els.customTypeField.style.display = (els.typeSelect.value === 'อื่นๆ') ? 'flex' : 'none';
