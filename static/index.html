@@ -447,6 +447,41 @@
     transform:translateX(-50%) translateY(0);
   }
 
+  /* ---- Lucide Icons ---- */
+  .lucide{
+    width:17px; height:17px;
+    stroke:currentColor;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    fill:none;
+    flex-shrink:0;
+    vertical-align:middle;
+  }
+  .btn-primary .lucide, .btn-secondary .lucide { width:16px; height:16px; }
+
+  /* ---- OpenCV Notice Banner ---- */
+  .opencv-notice{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background:rgba(245,158,11,0.08);
+    border:1px solid rgba(245,158,11,0.25);
+    border-radius:var(--radius-sm);
+    padding:11px 14px;
+    margin:0 0 12px;
+    font-size:13px;
+    line-height:1.6;
+    color:var(--text);
+  }
+  .opencv-notice .icon-wrap{
+    color:#f59e0b;
+    flex-shrink:0;
+    margin-top:1px;
+  }
+  .opencv-notice strong{ color:#f59e0b; }
+  .opencv-notice a{ color:var(--accent); text-decoration:none; }
+
   @media (prefers-reduced-motion: reduce){
     .spinner{animation:none;}
     #toast{transition:none;}
@@ -469,6 +504,17 @@
 
   <div id="bannerSlot"></div>
 
+  <!-- OpenCV tech notice -->
+  <div class="opencv-notice">
+    <span class="icon-wrap"><i data-lucide="info" style="width:18px;height:18px;"></i></span>
+    <div>
+      <strong>ระบบตรวจจับด้วย OpenCV (Hough Circle Transform)</strong><br>
+      ยังไม่ได้เทรน AI Model — การนับอาศัยการตรวจจับวงกลมแบบคลาสสิก
+      อาจคลาดเคลื่อนในภาพที่ซับซ้อนหรือมีมุมเอียงมาก
+      สามารถ <strong>แตะบนรูปเพื่อเพิ่ม/ลบวงกลม</strong> ที่นับผิดได้
+    </div>
+  </div>
+
   <section class="card capture-panel">
     <div class="viewfinder" id="viewfinder">
       <video id="video" autoplay playsinline muted></video>
@@ -485,9 +531,11 @@
       <div class="canvas-tip" id="canvasTip" style="display:none;">แตะบนรูปเพื่อเพิ่ม/ลดวงกลมที่นับ</div>
     </div>
     <div class="capture-controls" id="captureControls" style="display:flex;">
-      <button class="btn-primary" id="btnCapture" disabled>📷 ถ่ายรูปและนับ</button>
-      <label class="btn-secondary" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:11px 14px; gap:6px;">
-        📁 เลือกรูปภาพ
+      <button class="btn-primary" id="btnCapture" disabled style="display:inline-flex;align-items:center;gap:7px;">
+        <i data-lucide="camera"></i> ถ่ายรูปและนับ
+      </button>
+      <label class="btn-secondary" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:11px 14px; gap:7px;">
+        <i data-lucide="image-up"></i> เลือกรูปภาพ
         <input type="file" id="fileUpload" accept="image/*" style="display:none;">
       </label>
     </div>
@@ -523,8 +571,12 @@
     </div>
 
     <div class="form-actions">
-      <button class="btn-secondary" id="btnRetake" style="flex:1;">ถ่ายใหม่</button>
-      <button class="btn-primary" id="btnSave" style="flex:1;">บันทึก</button>
+      <button class="btn-secondary" id="btnRetake" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
+        <i data-lucide="rotate-ccw"></i> ถ่ายใหม่
+      </button>
+      <button class="btn-primary" id="btnSave" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
+        <i data-lucide="save"></i> บันทึก
+      </button>
     </div>
   </section>
 
@@ -532,8 +584,12 @@
     <div class="history-header">
       <h2>ประวัติการนับ</h2>
       <div class="history-header-actions">
-        <button class="btn-ghost" id="btnExportJson">ส่งออก JSON</button>
-        <button class="btn-ghost" id="btnExportCsv">ส่งออก CSV</button>
+        <button class="btn-ghost" id="btnExportJson" style="display:inline-flex;align-items:center;gap:5px;">
+          <i data-lucide="file-json"></i> ส่งออก JSON
+        </button>
+        <button class="btn-ghost" id="btnExportCsv" style="display:inline-flex;align-items:center;gap:5px;">
+          <i data-lucide="file-spreadsheet"></i> ส่งออก CSV
+        </button>
       </div>
     </div>
 
@@ -544,7 +600,7 @@
 
     <div class="history-list" id="historyList">
       <div class="empty-state">
-        <div class="icon">◎</div>
+        <div class="icon"><i data-lucide="circle-dashed" style="width:28px;height:28px;opacity:.4;"></i></div>
         ยังไม่มีบันทึก — ถ่ายรูปแล้วกดบันทึกเพื่อเริ่มเก็บข้อมูล
       </div>
     </div>
@@ -553,6 +609,7 @@
 
 <div id="toast"><span class="dot"></span><span id="toastText">บันทึกแล้ว</span></div>
 
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://docs.opencv.org/4.9.0/opencv.js"></script>
 <script type="module">
@@ -1290,6 +1347,7 @@
   });
 
   // ---------- init ----------
+  if (typeof lucide !== 'undefined') lucide.createIcons();
   startCamera();
   syncHistory();
 })();
