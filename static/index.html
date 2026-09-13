@@ -484,9 +484,9 @@
       </div>
       <div class="canvas-tip" id="canvasTip" style="display:none;">แตะบนรูปเพื่อเพิ่ม/ลดวงกลมที่นับ</div>
     </div>
-    <div class="capture-controls" id="captureControls" style="display:none;">
-      <button class="btn-primary" id="btnCapture">📷 ถ่ายรูปและนับ</button>
-      <label class="btn-secondary" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:11px 14px;">
+    <div class="capture-controls" id="captureControls" style="display:flex;">
+      <button class="btn-primary" id="btnCapture" disabled>📷 ถ่ายรูปและนับ</button>
+      <label class="btn-secondary" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:11px 14px; gap:6px;">
         📁 เลือกรูปภาพ
         <input type="file" id="fileUpload" accept="image/*" style="display:none;">
       </label>
@@ -515,10 +515,13 @@
     </div>
 
     <div class="field">
-      <label for="typeSelect">ประเภทหลอดด้าย</label>
+      <label for="typeSelect">ประเภทความเสียหายของหลอดด้าย</label>
       <select id="typeSelect">
-        <option value="พันทับ">พันทับ</option>
-        <option value="ใยแตก">ใยแตก</option>
+        <option value="ใยพันทับ">ใยพันทับ</option>
+        <option value="ใยกระแทก">ใยกระแทก</option>
+        <option value="ใยลุ่ย">ใยลุ่ย</option>
+        <option value="ใยสองเส้น">ใยสองเส้น</option>
+        <option value="ใยแตกปลาย">ใยแตกปลาย</option>
         <option value="อื่นๆ">อื่นๆ</option>
       </select>
     </div>
@@ -560,7 +563,7 @@
 <div id="toast"><span class="dot"></span><span id="toastText">บันทึกแล้ว</span></div>
 
 <script src="https://docs.opencv.org/4.9.0/opencv.js"></script>
-<script>
+<script type="module">
 (function(){
   "use strict";
 
@@ -648,13 +651,12 @@
 
   function startCamera(){
     els.cameraState.style.display = 'flex';
-    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังเปิดกล้อง...</span>';
-    els.captureControls.style.display = 'none';
+    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังเปิดกล้อง... (หรือกดเลือกรูปภาพด้านล่าง)</span>';
+    els.btnCapture.disabled = true;
+    els.captureControls.style.display = 'flex';
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      showBanner('เบราว์เซอร์นี้ไม่รองรับการเปิดกล้องโดยตรง คุณสามารถกดปุ่ม "เลือกรูปภาพ" เพื่อทดสอบได้');
-      els.cameraState.innerHTML = '<span>สามารถเลือกรูปภาพเพื่อทดสอบได้</span>';
-      els.captureControls.style.display = 'flex';
+      els.cameraState.innerHTML = '<span>สามารถกดปุ่ม "เลือกรูปภาพ" หรือลากรูปมาวางที่นี่ได้</span>';
       return;
     }
 
@@ -667,11 +669,9 @@
       video.style.display = 'block';
       overlayCanvas.style.display = 'none';
       els.cameraState.style.display = 'none';
-      els.captureControls.style.display = 'flex';
+      els.btnCapture.disabled = false;
     }).catch(function(err){
-      els.cameraState.innerHTML = '<span>ไม่สามารถเปิดกล้องได้ (สามารถใช้ปุ่ม "เลือกรูปภาพ" แทนได้)</span>';
-      els.captureControls.style.display = 'flex';
-      showBanner('ไม่สามารถเข้าถึงกล้องได้ คุณสามารถเลือกไฟล์ภาพแทนได้', startCamera);
+      els.cameraState.innerHTML = '<span>กล้องไม่พร้อมใช้งาน — สามารถกด "เลือกรูปภาพ" หรือลากรูปมาวางที่นี่ได้</span>';
     });
   }
 
@@ -849,10 +849,9 @@
     els.countInput.value = count;
   });
 
-  // Handle file upload
-  els.fileUpload.addEventListener('change', function(e){
-    var file = e.target.files[0];
-    if (!file) return;
+  // Load image helper
+  function loadImageFromFile(file){
+    if (!file || !file.type.startsWith('image/')) return;
     var reader = new FileReader();
     reader.onload = function(evt){
       var img = new Image();
@@ -866,6 +865,45 @@
       img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
+  }
+
+  // Handle file upload button
+  els.fileUpload.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (file) {
+      loadImageFromFile(file);
+      els.fileUpload.value = ''; // reset so same file can be selected again
+    }
+  });
+
+  // Drag & Drop on viewfinder
+  var viewfinderEl = document.getElementById('viewfinder');
+  viewfinderEl.addEventListener('dragover', function(e){
+    e.preventDefault();
+    viewfinderEl.style.outline = '2px dashed var(--accent)';
+  });
+  viewfinderEl.addEventListener('dragleave', function(e){
+    e.preventDefault();
+    viewfinderEl.style.outline = 'none';
+  });
+  viewfinderEl.addEventListener('drop', function(e){
+    e.preventDefault();
+    viewfinderEl.style.outline = 'none';
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]){
+      loadImageFromFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  // Paste image from clipboard (Ctrl+V)
+  window.addEventListener('paste', function(e){
+    var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (var i = 0; i < items.length; i++){
+      if (items[i].type.indexOf('image') !== -1){
+        var file = items[i].getAsFile();
+        loadImageFromFile(file);
+        break;
+      }
+    }
   });
 
   // ---------- form helpers ----------

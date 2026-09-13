@@ -76,7 +76,7 @@ DATA_FILE = Path("records.json")
 class TubeRecordModel(BaseModel):
     id: Optional[str] = None
     time_str: Optional[str] = ""
-    tube_type: str = "พันทับ"
+    tube_type: str = "ใยพันทับ"
     count: int = 0
     image_url: Optional[str] = None
     thumb_url: Optional[str] = None
