@@ -8,65 +8,66 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 
-import cv2
-import numpy as np
+# import cv2           # OpenCV — commented out, replaced by YOLO
+# import numpy as np   # no longer needed for detection
 from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from ultralytics import YOLO
 
 # -------------------------------------------------------------
-# Computer Vision: Circle Counting Logic (OpenCV)
+# YOLO Model — lazy load on first request
 # -------------------------------------------------------------
-def count_circles(image_path: str, out_path: Optional[str] = None, dp: float = 1.2,
-                  min_dist: float = 25.0, param1: float = 80.0, param2: float = 35.0,
-                  min_r: int = 18, max_r: int = 55, crop: Optional[Tuple[int, int, int, int]] = None):
-    img = cv2.imread(image_path)
-    if img is None:
-        raise FileNotFoundError(f"Image not found at {image_path}")
+MODEL_PATH = Path(__file__).parent / "model" / "best.pt"
+_yolo_model: Optional[YOLO] = None
 
-    if crop is not None:
-        y1, y2, x1, x2 = crop
-        img = img[y1:y2, x1:x2]
+def get_model() -> YOLO:
+    global _yolo_model
+    if _yolo_model is None:
+        _yolo_model = YOLO(str(MODEL_PATH))
+    return _yolo_model
 
-    # resize down for speed + more stable Hough params (keep aspect ratio)
-    h, w = img.shape[:2]
-    scale = 1000 / max(h, w)
-    if scale < 1:
-        img = cv2.resize(img, (int(w * scale), int(h * scale)))
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.medianBlur(gray, 5)
-    gray = cv2.equalizeHist(gray)  # boost contrast between metal rim and dark hole
-
-    circles = cv2.HoughCircles(
-        gray, cv2.HOUGH_GRADIENT,
-        dp=dp, minDist=min_dist,
-        param1=param1, param2=param2,
-        minRadius=min_r, maxRadius=max_r
+def count_with_yolo(image_path: str, out_path: Optional[str] = None,
+                    conf: float = 0.25, iou: float = 0.45):
+    """Run YOLO inference, draw boxes, return (count, boxes_list, annotated_img_bytes)."""
+    model = get_model()
+    results = model.predict(
+        source=image_path,
+        conf=conf,
+        iou=iou,
+        imgsz=1280,
+        verbose=False
     )
+    result = results[0]
+    count = len(result.boxes)
+    boxes = []
+    for i, box in enumerate(result.boxes):
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        boxes.append({
+            "index": i + 1,
+            "x1": round(x1), "y1": round(y1),
+            "x2": round(x2), "y2": round(y2),
+            "conf": round(float(box.conf[0]), 3)
+        })
 
-    out = img.copy()
-    count = 0
-    circle_items = []
-    if circles is not None:
-        circles = np.uint16(np.around(circles))
-        count = circles.shape[1]
-        for i, (x, y, r) in enumerate(circles[0, :]):
-            circle_items.append({"index": i + 1, "x": int(x), "y": int(y), "r": int(r)})
-            cv2.circle(out, (x, y), r, (0, 255, 0), 2)
-            cv2.circle(out, (x, y), 2, (0, 0, 255), 3)
-            cv2.putText(out, str(i + 1), (x - 10, y + 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
-
-    cv2.putText(out, f"Count: {count}", (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 255), 3)
-
+    # Save annotated image
     if out_path:
-        cv2.imwrite(out_path, out)
+        annotated = result.plot()          # numpy BGR array with boxes drawn
+        import cv2
+        cv2.imwrite(out_path, annotated)
 
-    return count, circle_items, out
+    return count, boxes
+
+# -------------------------------------------------------------
+# [COMMENTED OUT] OpenCV Hough Circle Detection
+# -------------------------------------------------------------
+# def count_circles(image_path, out_path=None, dp=1.2, min_dist=25.0,
+#                   param1=80.0, param2=35.0, min_r=18, max_r=55, crop=None):
+#     img = cv2.imread(image_path)
+#     ...  (Hough Circle Transform — replaced by YOLO)
+
 
 # -------------------------------------------------------------
 # JSON File Storage
@@ -175,40 +176,32 @@ def delete_record(record_id: str):
 @app.post("/api/detect")
 async def detect_tubes(
     file: UploadFile = File(...),
-    dp: float = Form(1.2),
-    min_dist: float = Form(25.0),
-    param1: float = Form(80.0),
-    param2: float = Form(35.0),
-    min_r: int = Form(18),
-    max_r: int = Form(55)
+    conf: float = Form(0.25),
+    iou: float = Form(0.45),
 ):
     ext = Path(file.filename or "image.jpg").suffix.lower()
     if ext not in [".jpg", ".jpeg", ".png", ".webp", ".bmp"]:
         ext = ".jpg"
-    
+
     unique_id = uuid.uuid4().hex
     raw_path = UPLOAD_DIR / f"raw_{unique_id}{ext}"
-    annotated_path = UPLOAD_DIR / f"annotated_{unique_id}{ext}"
+    annotated_path = UPLOAD_DIR / f"annotated_{unique_id}.jpg"
 
     content = await file.read()
     with open(raw_path, "wb") as f:
         f.write(content)
 
     try:
-        count, circles, _ = count_circles(
+        count, boxes = count_with_yolo(
             str(raw_path),
             out_path=str(annotated_path),
-            dp=dp,
-            min_dist=min_dist,
-            param1=param1,
-            param2=param2,
-            min_r=min_r,
-            max_r=max_r
+            conf=conf,
+            iou=iou,
         )
         return {
             "success": True,
             "count": count,
-            "circles": circles,
+            "boxes": boxes,
             "raw_image_url": f"/uploads/{raw_path.name}",
             "annotated_image_url": f"/uploads/{annotated_path.name}"
         }
