@@ -28,3 +28,6 @@ tube_counter.db
 # IDE
 .vscode/
 .idea/
+
+# IMG
+Img/
