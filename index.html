@@ -504,16 +504,7 @@
 
   <div id="bannerSlot"></div>
 
-  <!-- OpenCV tech notice -->
-  <div class="opencv-notice">
-    <span class="icon-wrap"><i data-lucide="info" style="width:18px;height:18px;"></i></span>
-    <div>
-      <strong>ระบบตรวจจับด้วย OpenCV (Hough Circle Transform)</strong><br>
-      ยังไม่ได้เทรน AI Model — การนับอาศัยการตรวจจับวงกลมแบบคลาสสิก
-      อาจคลาดเคลื่อนในภาพที่ซับซ้อนหรือมีมุมเอียงมาก
-      สามารถ <strong>แตะบนรูปเพื่อเพิ่ม/ลบวงกลม</strong> ที่นับผิดได้
-    </div>
-  </div>
+
 
   <section class="card capture-panel">
     <div class="viewfinder" id="viewfinder">
@@ -527,7 +518,6 @@
         <span class="dot"></span>
         <span id="countChipText">นับได้ 0 หลอด</span>
       </div>
-      <div class="canvas-tip" id="canvasTip" style="display:none;">แตะบนรูปเพื่อเพิ่ม/ลดวงกลมที่นับ</div>
     </div>
     <div class="capture-controls" id="captureControls" style="display:flex;">
       <!-- Native camera capture -->
@@ -544,7 +534,7 @@
 
   <section class="card result-panel" id="resultPanel" style="display:none;">
     <div class="field">
-      <label for="countInput">จำนวนที่นับได้ (แก้ไขได้หากไม่ตรง หรือแตะบนรูป)</label>
+      <label for="countInput">จำนวนที่นับได้ (กด +/- เพื่อแก้ไขหาก AI นับพลาด)</label>
       <div class="count-editor">
         <button type="button" id="btnMinus" aria-label="ลดจำนวน">−</button>
         <input type="number" id="countInput" min="0" value="0">
@@ -880,43 +870,6 @@
     display.delete();
   }
 
-  // Interactive tap on canvas
-  overlayCanvas.addEventListener('click', function(e){
-    if (!cvReady || !lastFrameCanvas.width) return;
-    var rect = overlayCanvas.getBoundingClientRect();
-    var scaleX = overlayCanvas.width / rect.width;
-    var scaleY = overlayCanvas.height / rect.height;
-    var clickX = (e.clientX - rect.left) * scaleX;
-    var clickY = (e.clientY - rect.top) * scaleY;
-
-    var foundIndex = -1;
-    for (var i = 0; i < detectedCircles.length; i++){
-      var dx = detectedCircles[i].x - clickX;
-      var dy = detectedCircles[i].y - clickY;
-      if (Math.sqrt(dx*dx + dy*dy) < 22) {
-        foundIndex = i;
-        break;
-      }
-    }
-
-    if (foundIndex >= 0) {
-      detectedCircles.splice(foundIndex, 1);
-    } else {
-      detectedCircles.push({x: clickX, y: clickY, r: 28, index: detectedCircles.length + 1});
-    }
-
-    detectedCircles.forEach(function(c, idx){ c.index = idx + 1; });
-
-    var baseMat = cv.imread(lastFrameCanvas);
-    var resized = new cv.Mat();
-    cv.resize(baseMat, resized, new cv.Size(overlayCanvas.width, overlayCanvas.height), 0, 0, cv.INTER_AREA);
-    redrawCirclesOnCanvas(overlayCanvas, resized, detectedCircles);
-    baseMat.delete(); resized.delete();
-
-    var count = detectedCircles.length;
-    els.countChipText.textContent = 'นับได้ ' + count + ' หลอด';
-    els.countInput.value = count;
-  });
 
   // ---------- image load helper ----------
   // MAX pixel dimension before passing to OpenCV (phone cameras = 12–48MP → too slow without this)
