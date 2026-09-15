@@ -531,11 +531,11 @@
     </div>
     <div class="capture-controls" id="captureControls" style="display:flex;">
       <!-- Native camera capture -->
-      <label class="btn-primary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;">
+      <label class="btn-primary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;border-radius:8px;">
         <i data-lucide="camera"></i> ถ่ายรูป
         <input type="file" id="cameraCapture" accept="image/*" capture="environment" style="display:none;">
       </label>
-      <label class="btn-secondary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:11px 14px;gap:7px;">
+      <label class="btn-secondary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:11px 14px;gap:7px;border-radius:8px;">
         <i data-lucide="image-up"></i> เลือกจากคลัง
         <input type="file" id="fileUpload" accept="image/*" style="display:none;">
       </label>
@@ -718,29 +718,12 @@
     if (video) video.style.display = 'none';
     overlayCanvas.style.display = 'block';
     els.cameraState.style.display = 'flex';
-    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังประมวลผล...</span>';
+    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังส่งภาพไปให้ AI ตรวจจับ...</span>';
 
-    if (cvReady) {
-      setTimeout(function(){
-        try {
-          var count = runHoughCirclesAuto(lastFrameCanvas, overlayCanvas);
-          els.cameraState.style.display = 'none';
-          els.countChip.style.display = 'flex';
-          els.canvasTip.style.display = 'block';
-          els.countChipText.textContent = 'นับได้ ' + count + ' หลอด';
-          els.countInput.value = count;
-          els.resultPanel.style.display = 'flex';
-        } catch (e) {
-          console.warn("Client OpenCV failed, using server fallback:", e);
-          serverDetectFallback();
-        }
-      }, 40);
-    } else {
-      serverDetectFallback();
-    }
+    serverDetect();
   }
 
-  function serverDetectFallback(){
+  function serverDetect(){
     lastFrameCanvas.toBlob(function(blob){
       var formData = new FormData();
       formData.append('file', blob, 'frame.jpg');
