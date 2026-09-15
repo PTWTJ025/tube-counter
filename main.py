@@ -37,7 +37,7 @@ def count_with_yolo(image_path: str, out_path: Optional[str] = None,
         source=image_path,
         conf=conf,
         iou=iou,
-        imgsz=1280,
+        imgsz=640,
         verbose=False
     )
     result = results[0]
