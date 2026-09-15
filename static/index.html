@@ -520,9 +520,9 @@
       <video id="video" autoplay playsinline muted></video>
       <canvas id="captureCanvas" style="display:none;"></canvas>
       <canvas id="overlayCanvas" style="display:none;"></canvas>
-      <div class="state-msg" id="cameraState">
+      <div class="state-msg" id="cameraState" style="display:none;">
         <div class="spinner"></div>
-        <span>กำลังเปิดกล้อง...</span>
+        <span>กำลังประมวลผล...</span>
       </div>
       <div class="count-chip" id="countChip" style="display:none;">
         <span class="dot"></span>
@@ -531,11 +531,13 @@
       <div class="canvas-tip" id="canvasTip" style="display:none;">แตะบนรูปเพื่อเพิ่ม/ลดวงกลมที่นับ</div>
     </div>
     <div class="capture-controls" id="captureControls" style="display:flex;">
-      <button class="btn-primary" id="btnCapture" disabled style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
-        <i data-lucide="camera"></i> ถ่ายรูปและนับ
-      </button>
-      <label class="btn-secondary" style="flex:1;display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:11px 14px; gap:7px;">
-        <i data-lucide="image-up"></i> เลือกรูปภาพ
+      <!-- ถ่ายด้วยกล้องโทรศัพท์โดยตรง (capture=environment) -->
+      <label class="btn-primary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;gap:7px;">
+        <i data-lucide="camera"></i> ถ่ายรูป
+        <input type="file" id="cameraCapture" accept="image/*" capture="environment" style="display:none;">
+      </label>
+      <label class="btn-secondary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:11px 14px;gap:7px;">
+        <i data-lucide="image-up"></i> เลือกจากคลัง
         <input type="file" id="fileUpload" accept="image/*" style="display:none;">
       </label>
     </div>
@@ -572,7 +574,7 @@
 
     <div class="form-actions">
       <button class="btn-secondary" id="btnRetake" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
-        <i data-lucide="rotate-ccw"></i> ถ่ายใหม่
+        <i data-lucide="rotate-ccw"></i> เลือกรูปใหม่
       </button>
       <button class="btn-primary" id="btnSave" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
         <i data-lucide="save"></i> บันทึก
@@ -634,6 +636,7 @@
     captureControls: document.getElementById('captureControls'),
     btnCapture: document.getElementById('btnCapture'),
     fileUpload: document.getElementById('fileUpload'),
+    cameraCapture: document.getElementById('cameraCapture'),
     countChip: document.getElementById('countChip'),
     countChipText: document.getElementById('countChipText'),
     canvasTip: document.getElementById('canvasTip'),
@@ -697,30 +700,11 @@
     els.bannerSlot.appendChild(b);
   }
 
+  // ไม่เปิดกล้องอัตโนมัติอีกต่อไป — ใช้กล้องโทรศัพท์ native แทน
   function startCamera(){
-    els.cameraState.style.display = 'flex';
-    els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังเปิดกล้อง... (หรือกดเลือกรูปภาพด้านล่าง)</span>';
-    els.btnCapture.disabled = true;
+    // แค่เซ็ต state เริ่มต้น ไม่ getUserMedia
+    els.cameraState.style.display = 'none';
     els.captureControls.style.display = 'flex';
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      els.cameraState.innerHTML = '<span>สามารถกดปุ่ม "เลือกรูปภาพ" หรือลากรูปมาวางที่นี่ได้</span>';
-      return;
-    }
-
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width:{ideal:1280}, height:{ideal:1706} },
-      audio: false
-    }).then(function(s){
-      stream = s;
-      video.srcObject = s;
-      video.style.display = 'block';
-      overlayCanvas.style.display = 'none';
-      els.cameraState.style.display = 'none';
-      els.btnCapture.disabled = false;
-    }).catch(function(err){
-      els.cameraState.innerHTML = '<span>กล้องไม่พร้อมใช้งาน — สามารถกด "เลือกรูปภาพ" หรือลากรูปมาวางที่นี่ได้</span>';
-    });
   }
 
   function resumeLiveView(){
@@ -728,9 +712,8 @@
     els.countChip.style.display = 'none';
     els.canvasTip.style.display = 'none';
     overlayCanvas.style.display = 'none';
-    if (stream) {
-      video.style.display = 'block';
-    }
+    video.style.display = 'none';
+    els.cameraState.style.display = 'none';
     els.captureControls.style.display = 'flex';
   }
 
@@ -1068,12 +1051,21 @@
   }
 
 
-  // Handle file upload button
+  // Handle gallery file picker
   els.fileUpload.addEventListener('change', function(e){
     var file = e.target.files[0];
     if (file) {
       loadImageFromFile(file);
-      els.fileUpload.value = ''; // reset so same file can be selected again
+      els.fileUpload.value = '';
+    }
+  });
+
+  // Handle native camera capture
+  els.cameraCapture.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (file) {
+      loadImageFromFile(file);
+      els.cameraCapture.value = '';
     }
   });
 
