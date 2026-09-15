@@ -494,7 +494,7 @@
   <header class="top">
     <div class="top-text">
       <h1>นับหลอดด้าย</h1>
-      <p>เปิดกล้อง ถ่ายรูปหลอดในตะกร้า แล้วระบบจะนับจำนวนให้อัตโนมัติ — ปรับแก้และบันทึกพร้อมระบุประเภทได้</p>
+      <p>ถ่ายรูปหลอดด้ายในตะกร้าด้วยกล้อง แล้วระบบจะนับจำนวนให้อัตโนมัติ — แตะบนรูปเพื่อปรับแก้ได้</p>
     </div>
     <div class="storage-badge" id="storageBadge">
       <span class="dot"></span>
@@ -517,12 +517,11 @@
 
   <section class="card capture-panel">
     <div class="viewfinder" id="viewfinder">
-      <video id="video" autoplay playsinline muted></video>
       <canvas id="captureCanvas" style="display:none;"></canvas>
       <canvas id="overlayCanvas" style="display:none;"></canvas>
-      <div class="state-msg" id="cameraState" style="display:none;">
-        <div class="spinner"></div>
-        <span>กำลังประมวลผล...</span>
+      <div class="state-msg" id="cameraState">
+        <i data-lucide="camera" style="width:40px;height:40px;opacity:.3;"></i>
+        <span style="color:var(--text-muted);font-size:13px;margin-top:4px;">กด "ถ่ายรูป" หรือ "เลือกจากคลัง" ด้านล่าง</span>
       </div>
       <div class="count-chip" id="countChip" style="display:none;">
         <span class="dot"></span>
@@ -531,8 +530,8 @@
       <div class="canvas-tip" id="canvasTip" style="display:none;">แตะบนรูปเพื่อเพิ่ม/ลดวงกลมที่นับ</div>
     </div>
     <div class="capture-controls" id="captureControls" style="display:flex;">
-      <!-- ถ่ายด้วยกล้องโทรศัพท์โดยตรง (capture=environment) -->
-      <label class="btn-primary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;gap:7px;">
+      <!-- Native camera capture -->
+      <label class="btn-primary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;">
         <i data-lucide="camera"></i> ถ่ายรูป
         <input type="file" id="cameraCapture" accept="image/*" capture="environment" style="display:none;">
       </label>
@@ -574,7 +573,7 @@
 
     <div class="form-actions">
       <button class="btn-secondary" id="btnRetake" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
-        <i data-lucide="rotate-ccw"></i> เลือกรูปใหม่
+        <i data-lucide="rotate-ccw"></i> ถ่ายใหม่
       </button>
       <button class="btn-primary" id="btnSave" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;">
         <i data-lucide="save"></i> บันทึก
@@ -634,9 +633,8 @@
   var els = {
     cameraState: document.getElementById('cameraState'),
     captureControls: document.getElementById('captureControls'),
-    btnCapture: document.getElementById('btnCapture'),
+    btnCapture: document.getElementById('cameraCapture'),
     fileUpload: document.getElementById('fileUpload'),
-    cameraCapture: document.getElementById('cameraCapture'),
     countChip: document.getElementById('countChip'),
     countChipText: document.getElementById('countChipText'),
     canvasTip: document.getElementById('canvasTip'),
@@ -700,33 +698,21 @@
     els.bannerSlot.appendChild(b);
   }
 
-  // ไม่เปิดกล้องอัตโนมัติอีกต่อไป — ใช้กล้องโทรศัพท์ native แทน
-  function startCamera(){
-    // แค่เซ็ต state เริ่มต้น ไม่ getUserMedia
-    els.cameraState.style.display = 'none';
-    els.captureControls.style.display = 'flex';
-  }
-
   function resumeLiveView(){
     els.resultPanel.style.display = 'none';
     els.countChip.style.display = 'none';
     els.canvasTip.style.display = 'none';
     overlayCanvas.style.display = 'none';
-    video.style.display = 'none';
-    els.cameraState.style.display = 'none';
     els.captureControls.style.display = 'flex';
+    // Reset viewfinder to placeholder
+    els.cameraState.style.display = 'flex';
+    els.cameraState.innerHTML =
+      '<i data-lucide="camera" style="width:40px;height:40px;opacity:.3;"></i>' +
+      '<span style="color:var(--text-muted);font-size:13px;margin-top:4px;">กด "ถ่ายรูป" หรือ "เลือกจากคลัง" ด้านล่าง</span>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
   }
 
   // ---------- capture + detect ----------
-  function captureFrame(){
-    var w = video.videoWidth || 640, h = video.videoHeight || 480;
-    if (!w || !h) return;
-    lastFrameCanvas.width = w;
-    lastFrameCanvas.height = h;
-    var ctx = lastFrameCanvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, w, h);
-  }
-
   function detectAndRender(){
     els.captureControls.style.display = 'none';
     video.style.display = 'none';
@@ -1051,21 +1037,12 @@
   }
 
 
-  // Handle gallery file picker
+  // Handle file upload button
   els.fileUpload.addEventListener('change', function(e){
     var file = e.target.files[0];
     if (file) {
       loadImageFromFile(file);
-      els.fileUpload.value = '';
-    }
-  });
-
-  // Handle native camera capture
-  els.cameraCapture.addEventListener('change', function(e){
-    var file = e.target.files[0];
-    if (file) {
-      loadImageFromFile(file);
-      els.cameraCapture.value = '';
+      els.fileUpload.value = ''; // reset so same file can be selected again
     }
   });
 
@@ -1308,9 +1285,13 @@
   }
 
   // ---------- wire up events ----------
-  els.btnCapture.addEventListener('click', function(){
-    captureFrame();
-    detectAndRender();
+  // Native camera capture (takes photo via phone camera app)
+  document.getElementById('cameraCapture').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (file) {
+      loadImageFromFile(file);
+      e.target.value = '';
+    }
   });
 
   els.btnRetake.addEventListener('click', resumeLiveView);
@@ -1340,7 +1321,6 @@
 
   // ---------- init ----------
   if (typeof lucide !== 'undefined') lucide.createIcons();
-  startCamera();
   syncHistory();
 })();
 </script>
