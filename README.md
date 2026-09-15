@@ -1,158 +1,108 @@
-# Tube Counter — เว็บนับหลอดด้ายด้วยกล้อง
+# 🏭 Tube Counter
 
-เครื่องมือสำหรับพนักงานหน้างานถ่ายรูปหลอดด้ายในตะกร้า แล้วระบบนับจำนวนอัตโนมัติด้วย
-Computer Vision (Hough Circle Transform) พร้อมบันทึกประวัติแยกตามประเภทหลอด
-(พันทับ / ใยแตก / อื่นๆ) ลงฐานข้อมูล
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.13-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13">
+  <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI">
+  <img src="https://img.shields.io/badge/YOLOv8-FF4F00?style=for-the-badge&logo=pytorch" alt="YOLOv8">
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Render-Deploy_Ready-46E3B7?style=for-the-badge" alt="Render Ready">
+</p>
+
+An intelligent, AI-powered industrial web application for automatically detecting and counting thread tubes in baskets using Computer Vision (YOLOv8) and FastAPI. Designed with a mobile-first UI for factory field workers.
 
 ---
 
-## 1. ภาพรวมสถาปัตยกรรม
+## ✨ Features
 
-```
+- **🧠 AI-Powered Detection**: Replaced legacy OpenCV Hough Circles with a custom-trained YOLOv8 model for robust, high-accuracy object detection even with overlapping or tilted tubes.
+- **📱 Mobile-First UI**: A responsive, clean interface tailored specifically for mobile usage on the factory floor.
+- **📸 Native Camera Integration**: Tap to open the mobile device's native camera immediately without jittery web-camera delays.
+- **⚡ Fast Cloud Backend**: FastAPI backend optimized for free-tier cloud deployment (e.g., Render) utilizing memory-efficient PyTorch CPU builds.
+- **📊 History & Export**: Keep track of counts, categorize defect types (เช่น ใยพันทับ, ใยแตก), and export data instantly to CSV or JSON.
+
+---
+
+## 🏗️ Architecture
+
+```text
 ┌─────────────────────────┐        ┌──────────────────────────┐
-│   Browser (มือถือ/แท็บเล็ต)  │        │   FastAPI server          │
-│                          │        │                            │
-│  static/index.html       │  HTTP  │  main.py                  │
-│  - เปิดกล้อง (getUserMedia)│ ─────▶ │  - เสิร์ฟหน้าเว็บ            │
-│  - นับวงกลม (OpenCV.js)   │ ◀───── │  - รับ/บันทึกผลนับ (API)     │
-│  - ส่งผลนับ + รูปย่อ       │  JSON  │  - อ่านประวัติ/ลบ/สรุปยอด    │
-└─────────────────────────┘        │  - เขียนลง tube_counter.db │
-                                    └──────────────┬─────────────┘
-                                                    │
-                                             ┌──────▼───────┐
-                                             │ SQLite         │
-                                             │ tube_counter.db│
-                                             └───────────────┘
+│   Browser (Mobile/PC)   │        │   FastAPI Server         │
+│                         │        │                          │
+│  - Vite Dev Server      │  HTTP  │  - YOLOv8 Inference      │
+│  - HTML/CSS/JS          │ ─────▶ │  - PyTorch (CPU mode)    │
+│  - Native Camera Upload │ ◀───── │  - JSON Data Storage     │
+└─────────────────────────┘        └──────────────────────────┘
 ```
 
-**แนวคิดสำคัญ:** การนับวงกลม (Hough Circle) รันที่ฝั่ง**เบราว์เซอร์**ทั้งหมด (ผ่าน OpenCV.js)
-เซิร์ฟเวอร์มีหน้าที่แค่**เก็บผลลัพธ์** ไม่ต้องประมวลผลภาพซ้ำ ทำให้เซิร์ฟเวอร์เบาและรองรับ
-หลายเครื่องพร้อมกันได้ง่าย
+## 🚀 Getting Started
 
----
+### Prerequisites
+- Python 3.13
+- Node.js & npm (for frontend development)
 
-## 2. เทคโนโลยีที่ใช้
-
-| ส่วน | เทคโนโลยี | เหตุผล |
-|---|---|---|
-| Frontend | HTML / CSS / Vanilla JS | ไฟล์เดียว รันได้ทุกเครื่องโดยไม่ต้อง build |
-| Circle detection | OpenCV.js (client-side) | ไม่ต้องส่งรูปไป process ที่ server ทุกครั้ง |
-| Backend | Python + FastAPI | เขียนน้อย เร็ว มี docs อัตโนมัติที่ `/docs` |
-| Database | SQLite (ผ่าน SQLModel) | ไฟล์เดียว ไม่ต้องติดตั้ง DB server แยก |
-| Dev server | Uvicorn | รองรับ auto-reload ตอนพัฒนา |
-
----
-
-## 3. โครงสร้างโปรเจกต์
-
-```
-tube-counter/
-├── venv/                  # virtual environment (ไม่ commit เข้า git)
-├── static/
-│   └── index.html         # หน้าเว็บนับหลอด
-├── main.py                # FastAPI app + API endpoints
-├── requirements.txt       # รายการ dependency
-├── tube_counter.db        # SQLite (สร้างอัตโนมัติตอนรันครั้งแรก)
-└── README.md              # เอกสารนี้
-```
-
----
-
-## 4. การติดตั้งและรันโปรเจกต์
-
-### ขั้นตอนติดตั้งครั้งแรก
+### 1. Backend Setup (FastAPI & YOLOv8)
 
 ```bash
-git clone <repo-url> tube-counter
+# Clone the repository
+git clone https://github.com/your-username/tube-counter.git
 cd tube-counter
 
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
+# Install dependencies (CPU-optimized PyTorch included)
 pip install -r requirements.txt
 ```
 
-### รันตอนพัฒนา (auto-reload เมื่อแก้โค้ด)
+### 2. Frontend Setup (Vite)
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Install frontend dependencies
+npm install
 ```
 
-เปิดเบราว์เซอร์ไปที่ `http://localhost:8000`
-ถ้าจะทดสอบผ่านมือถือในวงแลนเดียวกัน ใช้ `http://<ip-เครื่อง-server>:8000`
-(กล้องผ่านเว็บต้องใช้ HTTPS หรือ `localhost` เท่านั้น — ดูหัวข้อ 7)
+### 3. Run the Development Environment
 
-### รันตอนใช้งานจริง (production)
-
+Run both frontend and backend concurrently:
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+npm run dev
+```
+- **Frontend**: `http://localhost:5173`
+- **Backend API & Docs**: `http://localhost:8000/docs`
+
+---
+
+## ☁️ Deployment (Render)
+
+This project is configured for seamless deployment on [Render](https://render.com).
+
+1. Connect your GitHub repository to Render.
+2. Create a new **Web Service**.
+3. Use the following configuration (already provided in `render.yaml`):
+   - **Environment**: Python
+   - **Build Command**: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && pip install -r requirements.txt` (Ensures memory efficiency to prevent OOM errors).
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+---
+
+## 📂 Project Structure
+
+```text
+tube-counter/
+├── model/
+│   └── best.pt              # Custom trained YOLOv8 model
+├── static/                  # Production static assets
+├── index.html               # Main frontend entrypoint
+├── main.py                  # FastAPI application & endpoints
+├── package.json             # NPM scripts (concurrently, vite)
+├── render.yaml              # Render deployment configuration
+├── records.json             # File-based database
+└── requirements.txt         # Python dependencies
 ```
 
 ---
 
-## 5. แผน API Endpoints
-
-| Method | Path | หน้าที่ |
-|---|---|---|
-| `GET` | `/` | เสิร์ฟหน้าเว็บ `static/index.html` |
-| `POST` | `/api/counts` | บันทึกผลนับ 1 รายการ (ประเภท, จำนวน, รูปย่อ, เวลา) |
-| `GET` | `/api/counts` | ดึงประวัติทั้งหมด (เรียงล่าสุดก่อน) |
-| `DELETE` | `/api/counts/{id}` | ลบรายการที่บันทึกผิด |
-| `GET` | `/api/counts/export` | ดาวน์โหลด CSV ของประวัติทั้งหมด |
-| `GET` | `/api/counts/summary` | ยอดรวมจำนวนหลอด แยกตามประเภท |
-
-### ตัวอย่าง request/response — บันทึกผลนับ
-
-```http
-POST /api/counts
-Content-Type: application/json
-
-{
-  "type": "พันทับ",
-  "count": 55,
-  "thumbnail": "data:image/jpeg;base64,...",
-  "captured_at": "2026-09-12T14:32:00+07:00"
-}
-```
-
-```json
-{
-  "id": 17,
-  "type": "พันทับ",
-  "count": 55,
-  "captured_at": "2026-09-12T14:32:00+07:00"
-}
-```
-
----
-
-## 6. โครงสร้างฐานข้อมูล (ตาราง `tube_count`)
-
-| คอลัมน์ | ชนิดข้อมูล | คำอธิบาย |
-|---|---|---|
-| `id` | INTEGER, primary key | รหัสรายการ |
-| `type` | TEXT | ประเภทหลอด (พันทับ / ใยแตก / อื่นๆ) |
-| `count` | INTEGER | จำนวนที่นับได้ (หลังแก้ไขโดยผู้ใช้) |
-| `thumbnail` | TEXT | รูปย่อแบบ base64 (หรือ path ถ้าเก็บเป็นไฟล์แยก) |
-| `captured_at` | DATETIME | เวลาที่ถ่ายรูป/บันทึก |
-
----
-
-## 7. ข้อควรระวัง
-
-- **กล้องผ่านเบราว์เซอร์ต้องการ HTTPS** (ยกเว้นเข้าผ่าน `localhost`) — ถ้าจะใช้งานจริงผ่านวง
-  แลนโรงงานด้วย IP เครื่อง ต้องตั้ง reverse proxy (เช่น Nginx) พร้อมใบรับรอง SSL หรือใช้
-  self-signed certificate สำหรับทดสอบภายใน
-- **OpenCV.js โหลดจาก CDN** — ถ้าเครื่องที่ใช้งานไม่มีอินเทอร์เน็ต (LAN ปิด) ต้องดาวน์โหลด
-  `opencv.js` มาเก็บไว้ในโปรเจกต์แล้วอ้างอิง path ภายในแทน
-- **ข้อมูลรูปย่อ (thumbnail)** ถ้าเก็บเป็น base64 ในฐานข้อมูลตรงๆ ไฟล์ `.db` จะโตเร็ว
-  ถ้าใช้งานเยอะควรเก็บไฟล์รูปแยกไว้ในโฟลเดอร์ `static/uploads/` แล้วเก็บแค่ path ในฐานข้อมูลแทน
-
----
-
-## 8. แผนพัฒนาต่อ (ถ้าต้องการ)
-
-- เปลี่ยนจาก Hough Circle Transform → โมเดล YOLO ที่เทรนเองด้วยรูปจริงจากโรงงาน
-  (แม่นยำขึ้นในกรณีหลอดซ้อนทับ/เอียง)
-- เพิ่มระบบ login แยกผู้บันทึกแต่ละกะ/แผนก
-- Export รายงานสรุปรายวัน/รายสัปดาห์เป็น Excel
+<p align="center">
+  <i>Developed for optimized industrial counting workflows.</i>
+</p>
