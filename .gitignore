@@ -31,3 +31,11 @@ tube_counter.db
 
 # IMG
 Img/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Agent & AI
+.agents/
+.claude/

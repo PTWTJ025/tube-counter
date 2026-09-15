@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 <style>
   :root{
     --bg:#F5F6F7;
@@ -154,6 +157,47 @@
   .count-chip .dot{
     width:6px;height:6px;border-radius:50%;
     background:#4ADE80;
+  }
+
+  
+  /* ---- Guide Overlay ---- */
+  .guide-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 5;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .guide-hole {
+    width: 280px;
+    height: 373px;
+    background: transparent;
+    border: 2px solid rgba(255,255,255,0.4);
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.65);
+    position: relative;
+    border-radius: 12px;
+  }
+  .guide-hole::before, .guide-hole::after, .guide-hole .corner {
+    content: ''; position: absolute; width: 35px; height: 35px; border-color: #4ADE80; border-style: solid;
+  }
+  .guide-hole::before { top: -2px; left: -2px; border-width: 5px 0 0 5px; border-top-left-radius: 12px; }
+  .guide-hole::after { top: -2px; right: -2px; border-width: 5px 5px 0 0; border-top-right-radius: 12px; }
+  .guide-hole .corner-bl { bottom: -2px; left: -2px; border-width: 0 0 5px 5px; border-bottom-left-radius: 12px; }
+  .guide-hole .corner-br { bottom: -2px; right: -2px; border-width: 0 5px 5px 0; border-bottom-right-radius: 12px; }
+  .guide-text {
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 14.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
   }
 
   .canvas-tip{
@@ -510,6 +554,16 @@
     <div class="viewfinder" id="viewfinder">
       <canvas id="captureCanvas" style="display:none;"></canvas>
       <canvas id="overlayCanvas" style="display:none;"></canvas>
+
+      <video id="videoPreview" autoplay playsinline style="display:none; width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;"></video>
+      <div id="guideOverlay" class="guide-overlay" style="display:none;">
+        <div class="guide-hole" id="guideHole">
+          <div class="corner corner-bl"></div>
+          <div class="corner corner-br"></div>
+          <div class="guide-text">เล็งตะกร้าให้อยู่ในกรอบนี้</div>
+        </div>
+      </div>
+
       <div class="state-msg" id="cameraState">
         <i data-lucide="camera" style="width:40px;height:40px;opacity:.3;"></i>
         <span style="color:var(--text-muted);font-size:13px;margin-top:4px;">กด "ถ่ายรูป" หรือ "เลือกจากคลัง" ด้านล่าง</span>
@@ -520,15 +574,33 @@
       </div>
     </div>
     <div class="capture-controls" id="captureControls" style="display:flex;">
-      <!-- Native camera capture -->
-      <label class="btn-primary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;border-radius:8px;">
-        <i data-lucide="camera"></i> ถ่ายรูป
-        <input type="file" id="cameraCapture" accept="image/*" capture="environment" style="display:none;">
-      </label>
+      <button class="btn-primary" id="btnStartCamera" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;">
+        <i data-lucide="camera"></i> กล้องเล็งเป้า
+      </button>
       <label class="btn-secondary" style="flex:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:11px 14px;gap:7px;border-radius:8px;">
         <i data-lucide="image-up"></i> เลือกจากคลัง
         <input type="file" id="fileUpload" accept="image/*" style="display:none;">
       </label>
+    </div>
+    <div class="capture-controls" id="liveControls" style="display:none; flex-direction:column; gap:10px;">
+      <button class="btn-primary" id="btnCaptureLive" style="background:#10b981;display:flex;align-items:center;justify-content:center;gap:7px;">
+        <i data-lucide="scan"></i> แชะ! (หยุดภาพ)
+      </button>
+      <button class="btn-ghost" id="btnCancelCamera">ยกเลิกกล้อง</button>
+    </div>
+
+    <div id="cropperContainer" style="display:none; position:absolute; inset:0; z-index:20; background:#000;">
+      <img id="cropperImage" src="" style="display:block; max-width:100%;">
+    </div>
+    <div class="capture-controls" id="cropperControls" style="display:none; flex-direction:column; gap:10px; position:relative; z-index:21; background:var(--surface);">
+      <div style="display:flex;gap:10px;">
+        <button class="btn-secondary" id="btnRetakeCrop" style="flex:1;padding:11px;">
+          ยกเลิก
+        </button>
+        <button class="btn-primary" id="btnConfirmCrop" style="flex:1;padding:11px;">
+          ยืนยันและนับเลย
+        </button>
+      </div>
     </div>
   </section>
 
@@ -602,32 +674,72 @@
 
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-<script src="https://docs.opencv.org/4.9.0/opencv.js"></script>
+
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+
 <script type="module">
 (function(){
   "use strict";
+
+  // ---------- Firebase Setup ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyC-jCpYWR8xGNAv2kL1bMqnUD1LQsSRFfw",
+    authDomain: "tube-counter-27b29.firebaseapp.com",
+    projectId: "tube-counter-27b29",
+    storageBucket: "tube-counter-27b29.firebasestorage.app",
+    messagingSenderId: "1015184714222",
+    appId: "1:1015184714222:web:780ed32be7ec69d753c6ff",
+    measurementId: "G-9YWQS3PH1C"
+  };
+  
+  // Initialize only if config is set
+  var db = null;
+  var storage = null;
+  if(firebaseConfig.apiKey !== "YOUR_API_KEY"){
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      storage = firebase.storage();
+  }
+
 
   // API base URL for Production (Render) vs Dev (Vite proxy)
   var API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ? import.meta.env.VITE_API_URL : '';
 
   // ---------- state ----------
   var stream = null;
-  var cvReady = false;
+  
   var lastFrameCanvas = document.getElementById('captureCanvas');
   var overlayCanvas = document.getElementById('overlayCanvas');
-  var video = document.getElementById('video');
-  var history = []; // [{id, time, type, count, thumb}]
-  var detectedCircles = []; // [{x, y, r, index}]
+  var video = document.getElementById('videoPreview');
+  var history = [];
+  var cropper = null;
+ // [{id, time, type, count, thumb}]
+  
   var LOCAL_STORAGE_KEY = 'tube_counter_history_v1';
 
   var els = {
     cameraState: document.getElementById('cameraState'),
     captureControls: document.getElementById('captureControls'),
-    btnCapture: document.getElementById('cameraCapture'),
+    
     fileUpload: document.getElementById('fileUpload'),
+    btnStartCamera: document.getElementById('btnStartCamera'),
+    liveControls: document.getElementById('liveControls'),
+    btnCaptureLive: document.getElementById('btnCaptureLive'),
+    btnCancelCamera: document.getElementById('btnCancelCamera'),
+    cropperContainer: document.getElementById('cropperContainer'),
+    cropperControls: document.getElementById('cropperControls'),
+    cropperImage: document.getElementById('cropperImage'),
+    btnRetakeCrop: document.getElementById('btnRetakeCrop'),
+    btnConfirmCrop: document.getElementById('btnConfirmCrop'),
+    guideOverlay: document.getElementById('guideOverlay'),
+
     countChip: document.getElementById('countChip'),
     countChipText: document.getElementById('countChipText'),
-    canvasTip: document.getElementById('canvasTip'),
+    
     resultPanel: document.getElementById('resultPanel'),
     countInput: document.getElementById('countInput'),
     btnMinus: document.getElementById('btnMinus'),
@@ -651,22 +763,7 @@
     storageBadgeText: document.getElementById('storageBadgeText')
   };
 
-  // ---------- opencv ready ----------
-  function onOpenCvReady(){
-    cvReady = true;
-    console.log("OpenCV.js ready");
-  }
-  if (typeof cv !== 'undefined' && cv['onRuntimeInitialized'] !== undefined) {
-    cv['onRuntimeInitialized'] = onOpenCvReady;
-  } else {
-    var waitCv = setInterval(function(){
-      if (window.cv && cv.Mat) {
-        clearInterval(waitCv);
-        cv['onRuntimeInitialized'] = onOpenCvReady;
-        cvReady = true;
-      }
-    }, 200);
-  }
+
 
   // ---------- camera ----------
   function showBanner(msg, retryFn){
@@ -691,7 +788,7 @@
   function resumeLiveView(){
     els.resultPanel.style.display = 'none';
     els.countChip.style.display = 'none';
-    els.canvasTip.style.display = 'none';
+    
     overlayCanvas.style.display = 'none';
     els.captureControls.style.display = 'flex';
     // Reset viewfinder to placeholder
@@ -748,132 +845,12 @@
     }, 'image/jpeg', 0.85);
   }
 
-  // Auto-tune param2: try several values and pick the one whose count
-  // is closest to the median of all non-zero results.
-  function runHoughCirclesAuto(srcCanvas, outCanvas){
-    var src = cv.imread(srcCanvas);
-    var resized = new cv.Mat();
-    var maxDim = Math.max(src.rows, src.cols);
-    var scale = Math.min(1, 1000 / maxDim);
-    var newW = Math.max(1, Math.round(src.cols * scale));
-    var newH = Math.max(1, Math.round(src.rows * scale));
-    cv.resize(src, resized, new cv.Size(newW, newH), 0, 0, cv.INTER_AREA);
 
-    var gray = new cv.Mat();
-    cv.cvtColor(resized, gray, cv.COLOR_RGBA2GRAY);
-    var blurred = new cv.Mat();
-    cv.medianBlur(gray, blurred, 5);
-    var eq = new cv.Mat();
-    cv.equalizeHist(blurred, eq);
-
-    // Try multiple param2 values and collect results
-    var candidates = [20, 25, 30, 35, 40, 45, 50, 55, 60];
-    var results = [];
-    for (var ti = 0; ti < candidates.length; ti++){
-      var p2 = candidates[ti];
-      var c = new cv.Mat();
-      cv.HoughCircles(eq, c, cv.HOUGH_GRADIENT, 1.2, 25, 80, p2, 18, 55);
-      results.push({ p2: p2, count: c.cols, mat: c });
-    }
-
-    // Find median count across non-zero results
-    var nonZero = results.filter(function(r){ return r.count > 0; });
-    var bestResult;
-    if (nonZero.length === 0){
-      bestResult = results[Math.floor(results.length / 2)];
-    } else {
-      var sorted = nonZero.slice().sort(function(a,b){ return a.count - b.count; });
-      var median = sorted[Math.floor(sorted.length / 2)].count;
-      // Pick the result closest to median (prefer slightly higher param2 = stricter)
-      var best = nonZero[0], bestDiff = Math.abs(nonZero[0].count - median);
-      for (var ri = 1; ri < nonZero.length; ri++){
-        var diff = Math.abs(nonZero[ri].count - median);
-        if (diff < bestDiff || (diff === bestDiff && nonZero[ri].p2 > best.p2)){
-          bestDiff = diff; best = nonZero[ri];
-        }
-      }
-      bestResult = best;
-    }
-
-    // Rebuild detectedCircles from chosen result
-    detectedCircles = [];
-    var chosen = bestResult.mat;
-    for (var i = 0; i < chosen.cols; i++){
-      detectedCircles.push({
-        x: chosen.data32F[i*3],
-        y: chosen.data32F[i*3+1],
-        r: chosen.data32F[i*3+2],
-        index: i + 1
-      });
-    }
-
-    outCanvas.width = newW;
-    outCanvas.height = newH;
-    redrawCirclesOnCanvas(outCanvas, resized, detectedCircles);
-
-    // cleanup
-    src.delete(); resized.delete(); gray.delete(); blurred.delete(); eq.delete();
-    results.forEach(function(r){ r.mat.delete(); });
-
-    return detectedCircles.length;
-  }
-
-  function runHoughCircles(srcCanvas, outCanvas, param2){
-    var src = cv.imread(srcCanvas);
-    var resized = new cv.Mat();
-    var maxDim = Math.max(src.rows, src.cols);
-    var scale = Math.min(1, 1000 / maxDim);
-    var newW = Math.max(1, Math.round(src.cols * scale));
-    var newH = Math.max(1, Math.round(src.rows * scale));
-    cv.resize(src, resized, new cv.Size(newW, newH), 0, 0, cv.INTER_AREA);
-
-    var gray = new cv.Mat();
-    cv.cvtColor(resized, gray, cv.COLOR_RGBA2GRAY);
-    var blurred = new cv.Mat();
-    cv.medianBlur(gray, blurred, 5);
-    var eq = new cv.Mat();
-    cv.equalizeHist(blurred, eq);
-
-    var circles = new cv.Mat();
-    cv.HoughCircles(eq, circles, cv.HOUGH_GRADIENT, 1.2, 25, 80, param2, 18, 55);
-
-    detectedCircles = [];
-    var count = circles.cols;
-    for (var i = 0; i < circles.cols; i++){
-      var x = circles.data32F[i*3];
-      var y = circles.data32F[i*3+1];
-      var r = circles.data32F[i*3+2];
-      detectedCircles.push({x: x, y: y, r: r, index: i + 1});
-    }
-
-    outCanvas.width = newW;
-    outCanvas.height = newH;
-    redrawCirclesOnCanvas(outCanvas, resized, detectedCircles);
-
-    src.delete(); resized.delete(); gray.delete(); blurred.delete();
-    eq.delete(); circles.delete();
-    return count;
-  }
-
-  function redrawCirclesOnCanvas(outCanvas, baseMat, circlesList){
-    var display = baseMat.clone();
-    for (var i = 0; i < circlesList.length; i++){
-      var c = circlesList[i];
-      cv.circle(display, new cv.Point(c.x, c.y), c.r, new cv.Scalar(74, 222, 128, 255), 2);
-      cv.circle(display, new cv.Point(c.x, c.y), 2, new cv.Scalar(196, 69, 58, 255), 3);
-      cv.putText(display, String(i + 1), new cv.Point(c.x - 8, c.y + 4),
-                 cv.FONT_HERSHEY_SIMPLEX, 0.4, new cv.Scalar(255, 255, 0, 255), 1);
-    }
-    cv.putText(display, "Count: " + circlesList.length, new cv.Point(20, 40),
-               cv.FONT_HERSHEY_SIMPLEX, 1.0, new cv.Scalar(196, 69, 58, 255), 3);
-    cv.imshow(outCanvas, display);
-    display.delete();
-  }
 
 
   // ---------- image load helper ----------
   // MAX pixel dimension before passing to OpenCV (phone cameras = 12–48MP → too slow without this)
-  var MAX_IMG_DIM = 800;
+  var MAX_IMG_DIM = 1400;
 
   // HEIC/HEIF mime types + filename extensions browser usually can't decode
   function isHeic(file){
@@ -887,10 +864,17 @@
     els.cameraState.innerHTML = html;
   }
 
+  
   function restoreUI(){
     els.cameraState.style.display = 'none';
     els.captureControls.style.display = 'flex';
+    if(video) video.style.display = 'none';
+    els.guideOverlay.style.display = 'none';
+    els.liveControls.style.display = 'none';
+    els.cropperContainer.style.display = 'none';
+    els.cropperControls.style.display = 'none';
   }
+
 
   function loadImageFromFile(file){
     if (!file) return;
@@ -933,45 +917,110 @@
   }
 
   // แยก logic วาดภาพลง canvas ออกมา — ใช้ร่วมกันทั้ง JPEG ปกติ และ HEIC-converted
+  
   function loadBlobToCanvas(blob){
     var url;
     try { url = URL.createObjectURL(blob); } catch(e){ restoreUI(); return; }
 
-    var img = new Image();
-    img.onload = function(){
-      var w = img.naturalWidth, h = img.naturalHeight;
-      if (!w || !h){ URL.revokeObjectURL(url); restoreUI(); return; }
+    els.captureControls.style.display = 'none';
+    if (video) video.style.display = 'none';
+    els.guideOverlay.style.display = 'none';
+    els.liveControls.style.display = 'none';
+    els.cameraState.style.display = 'none';
+    
+    els.cropperImage.src = url;
+    els.cropperContainer.style.display = 'block';
+    els.cropperControls.style.display = 'flex';
 
-      // Scale down large phone photos before OpenCV (keeps accuracy, much faster)
-      var scale = Math.min(1, MAX_IMG_DIM / Math.max(w, h));
-      var tw = Math.round(w * scale);
-      var th = Math.round(h * scale);
-
-      showCameraState('<div class="spinner"></div><span>กำลังประมวลผล' +
-        (scale < 1 ? ' (ปรับขนาด ' + tw + '\u00d7' + th + 'px)' : '') + '...</span>');
-
-      lastFrameCanvas.width  = tw;
-      lastFrameCanvas.height = th;
-      var ctx = lastFrameCanvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, tw, th);
-
-      URL.revokeObjectURL(url);
-      detectAndRender();
-    };
-    img.onerror = function(){
-      URL.revokeObjectURL(url);
-      showCameraState(
-        '<div style="padding:16px;text-align:center;">' +
-        '<div style="font-size:26px;">⚠️</div>' +
-        'Browser เปิดไฟล์นี้ไม่ได้<br>' +
-        '<span style="font-size:12px;color:var(--text-muted);">ลองแปลงเป็น JPEG ก่อนส่งมา</span><br><br>' +
-        '<button onclick="restoreUI()" style="padding:8px 20px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;">ลองใหม่</button>' +
-        '</div>'
-      );
-    };
-    img.src = url;
+    if(cropper) { cropper.destroy(); }
+    cropper = new Cropper(els.cropperImage, {
+        aspectRatio: 3/4,
+        viewMode: 1,
+        dragMode: 'move',
+        background: false,
+        guides: true,
+        center: true,
+        autoCropArea: 1,
+        cropBoxResizable: false,
+        cropBoxMovable: false,
+        toggleDragModeOnDblclick: false,
+    });
   }
 
+
+
+  
+  // --- Live Camera ---
+  els.btnStartCamera.addEventListener('click', function(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        showBanner("บราวเซอร์ของคุณไม่รองรับการเปิดกล้องสด (อาจต้องเปิดผ่าน https)");
+        return;
+    }
+    els.captureControls.style.display = 'none';
+    els.cameraState.style.display = 'none';
+    if(video) video.style.display = 'block';
+    els.guideOverlay.style.display = 'flex';
+    els.liveControls.style.display = 'flex';
+    
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
+    .then(function(s){
+        stream = s;
+        if(video) {
+            video.srcObject = stream;
+            video.play();
+        }
+    }).catch(function(err){
+        restoreUI();
+        showBanner("ไม่สามารถเปิดกล้องได้: " + err.message);
+    });
+  });
+
+  els.btnCaptureLive.addEventListener('click', function(){
+    if(!video) return;
+    var w = video.videoWidth;
+    var h = video.videoHeight;
+    var cvs = document.createElement('canvas');
+    cvs.width = w; cvs.height = h;
+    cvs.getContext('2d').drawImage(video, 0, 0, w, h);
+    cvs.toBlob(function(blob){
+        if(stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        loadBlobToCanvas(blob);
+    }, 'image/jpeg', 0.9);
+  });
+
+  els.btnCancelCamera.addEventListener('click', function(){
+    if(stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    restoreUI();
+  });
+
+  // --- Cropper ---
+  els.btnRetakeCrop.addEventListener('click', function(){
+    if(cropper) { cropper.destroy(); cropper = null; }
+    els.cropperContainer.style.display = 'none';
+    els.cropperControls.style.display = 'none';
+    restoreUI();
+  });
+
+  els.btnConfirmCrop.addEventListener('click', function(){
+    if(!cropper) return;
+    showCameraState('<div class="spinner"></div><span>กำลังตัดภาพ...</span>');
+    var canvas = cropper.getCroppedCanvas();
+    if(cropper) { cropper.destroy(); cropper = null; }
+    els.cropperContainer.style.display = 'none';
+    els.cropperControls.style.display = 'none';
+
+    // Scale down before detection
+    var scale = Math.min(1, MAX_IMG_DIM / Math.max(canvas.width, canvas.height));
+    var tw = Math.round(canvas.width * scale);
+    var th = Math.round(canvas.height * scale);
+    
+    lastFrameCanvas.width = tw;
+    lastFrameCanvas.height = th;
+    var ctx = lastFrameCanvas.getContext('2d');
+    ctx.drawImage(canvas, 0, 0, tw, th);
+    
+    detectAndRender();
+  });
 
   // Handle file upload button
   els.fileUpload.addEventListener('change', function(e){
@@ -1044,34 +1093,37 @@
     } catch(e){}
   }
 
+  
   function syncHistory(){
-    fetch(API_BASE + '/api/records')
-      .then(function(res){ return res.json(); })
-      .then(function(data){
-        if (Array.isArray(data) && data.length > 0) {
-          history = data.map(function(r){
-            return {
-              id: r.id,
-              time: r.time_str || '',
-              type: r.tube_type || 'ทั่วไป',
-              count: r.count || 0,
-              thumb: r.thumb_url || r.image_url || ''
-            };
-          });
-          saveLocalHistory(history);
-        } else {
-          history = loadLocalHistory();
-        }
-        renderHistory();
-        els.storageBadgeText.textContent = 'JSON Store (' + history.length + ')';
-      })
-      .catch(function(){
-        // Offline or Firebase static hosting without backend active
+    if(!db) {
         history = loadLocalHistory();
         renderHistory();
         els.storageBadgeText.textContent = 'Local JSON (' + history.length + ')';
-      });
+        return;
+    }
+    
+    db.collection("tube_records").orderBy("created_at", "desc").get().then((querySnapshot) => {
+        history = [];
+        querySnapshot.forEach((doc) => {
+            var r = doc.data();
+            history.push({
+                id: doc.id,
+                time: r.time_str || '',
+                type: r.tube_type || 'ทั่วไป',
+                count: r.count || 0,
+                thumb: r.thumb_url || ''
+            });
+        });
+        saveLocalHistory(history);
+        renderHistory();
+        els.storageBadgeText.textContent = 'Firebase DB (' + history.length + ')';
+    }).catch(function(err){
+        history = loadLocalHistory();
+        renderHistory();
+        els.storageBadgeText.textContent = 'Offline (' + history.length + ')';
+    });
   }
+
 
   function renderHistory(){
     if (history.length === 0){
@@ -1113,7 +1165,7 @@
         delBtn.textContent = 'ลบ';
         delBtn.onclick = function(){
           if (entry.id) {
-            fetch(API_BASE + '/api/records/' + entry.id, { method: 'DELETE' }).catch(function(){});
+            if(db) { db.collection("tube_records").doc(entry.id).delete().catch(console.error); }
           }
           history = history.filter(function(e){ return e.id !== entry.id; });
           saveLocalHistory(history);
@@ -1129,59 +1181,58 @@
     }
   }
 
+  
   function saveEntry(){
     var count = parseInt(els.countInput.value, 10);
-    if (isNaN(count) || count < 0){
-      els.countInput.focus();
-      return;
-    }
-    if (els.typeSelect.value === 'อื่นๆ' && !els.customType.value.trim()){
-      els.customType.focus();
-      return;
-    }
+    if (isNaN(count) || count < 0){ els.countInput.focus(); return; }
+    if (els.typeSelect.value === 'อื่นๆ' && !els.customType.value.trim()){ els.customType.focus(); return; }
 
     var thumbCanvas = document.createElement('canvas');
     var tw = 160, th = Math.round(160 * (lastFrameCanvas.height / (lastFrameCanvas.width || 1)));
     thumbCanvas.width = tw; thumbCanvas.height = th;
     thumbCanvas.getContext('2d').drawImage(overlayCanvas.width ? overlayCanvas : lastFrameCanvas, 0, 0, tw, th);
-    var thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.7);
-
-    var now = new Date();
-    var timeStr = now.toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'});
+    
+    var timeStr = new Date().toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'});
     var typeStr = currentTypeLabel();
     var recordId = String(Date.now());
+    var thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.7);
 
-    var newEntry = {
-      id: recordId,
-      time: timeStr,
-      type: typeStr,
-      count: count,
-      thumb: thumbDataUrl
-    };
-
-    // Save to LocalStorage
-    history.push(newEntry);
+    var newEntry = { id: recordId, time: timeStr, type: typeStr, count: count, thumb: thumbDataUrl };
+    history.unshift(newEntry);
     saveLocalHistory(history);
     renderHistory();
-
-    // Post to backend records.json
-    fetch(API_BASE + '/api/records', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        id: recordId,
-        time_str: timeStr,
-        tube_type: typeStr,
-        count: count,
-        thumb_url: thumbDataUrl
-      })
-    }).catch(function(err){
-      console.log("Offline or saved locally:", err);
-    });
-
-    showToast('บันทึกข้อมูลเรียบร้อย');
     resumeLiveView();
+    showToast('กำลังบันทึกไปยัง Firebase...');
+
+    if(!db || !storage) {
+        showToast('บันทึก Offline สำเร็จ (ตั้งค่า Firebase ก่อน)');
+        return;
+    }
+
+    // Upload to Firebase Storage
+    thumbCanvas.toBlob(function(blob){
+        var ref = storage.ref('images/' + recordId + '.jpg');
+        ref.put(blob).then(function(snapshot) {
+            return ref.getDownloadURL();
+        }).then(function(url) {
+            // Save to Firestore
+            return db.collection("tube_records").doc(recordId).set({
+                time_str: timeStr,
+                tube_type: typeStr,
+                count: count,
+                thumb_url: url,
+                created_at: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }).then(function(){
+            showToast('บันทึกขึ้นคลาวด์เรียบร้อย!');
+            syncHistory();
+        }).catch(function(err){
+            console.error("Firebase Error:", err);
+            showToast('บันทึกล้มเหลว (เก็บแบบ Offline)');
+        });
+    }, 'image/jpeg', 0.7);
   }
+
 
   function exportCsv(){
     if (history.length === 0){
@@ -1221,16 +1272,7 @@
   }
 
   // ---------- wire up events ----------
-  // Native camera capture (takes photo via phone camera app)
-  document.getElementById('cameraCapture').addEventListener('change', function(e){
-    var file = e.target.files[0];
-    if (file) {
-      loadImageFromFile(file);
-      e.target.value = '';
-    }
-  });
-
-  els.btnRetake.addEventListener('click', resumeLiveView);
+els.btnRetake.addEventListener('click', resumeLiveView);
   els.btnSave.addEventListener('click', saveEntry);
 
   els.btnMinus.addEventListener('click', function(){
