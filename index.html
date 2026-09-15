@@ -715,7 +715,7 @@
   // ---------- capture + detect ----------
   function detectAndRender(){
     els.captureControls.style.display = 'none';
-    video.style.display = 'none';
+    if (video) video.style.display = 'none';
     overlayCanvas.style.display = 'block';
     els.cameraState.style.display = 'flex';
     els.cameraState.innerHTML = '<div class="spinner"></div><span>กำลังประมวลผล...</span>';
@@ -961,7 +961,7 @@
 
     // ── Show loading immediately ────────────────────────────────────────────
     els.captureControls.style.display = 'none';
-    video.style.display = 'none';
+    if (video) video.style.display = 'none';
     overlayCanvas.style.display = 'none';
     showCameraState('<div class="spinner"></div><span>กำลังโหลดรูปภาพ...</span>');
 
